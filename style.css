@@ -1,0 +1,422 @@
+:root {
+  --bg0: #040308;
+  --bg1: #130b1b;
+  --text: #fdfcff;
+  --muted: #e2d9eb;
+  --pink: #ff4d8d;
+  --gold: #ffd27a;
+  --safeTop: env(safe-area-inset-top, 0px);
+  --safeBot: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+body {
+  color: var(--text);
+  font-family:
+    "Noto Sans SC",
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    Helvetica,
+    Arial,
+    "Apple Color Emoji",
+    "Segoe UI Emoji";
+  background: radial-gradient(circle at 50% 100%, #2b1b3a 0%, var(--bg0) 80%);
+  overflow: hidden;
+  position: fixed; /* 锁定屏幕，防止滚动 */
+  width: 100%;
+  height: 100%;
+}
+
+#fx {
+  /* 保证 Canvas 全屏 */
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+}
+
+.app {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+}
+
+.top-controls,
+.start-overlay {
+  pointer-events: auto;
+}
+
+.top-controls {
+  position: absolute;
+  top: calc(20px + var(--safeTop));
+  right: 20px;
+  z-index: 10;
+}
+
+.icon-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: all 0.3s ease;
+}
+.icon-btn[aria-pressed="true"] {
+  background: rgba(255, 77, 141, 0.2);
+  border-color: rgba(255, 77, 141, 0.5);
+}
+
+.romantic-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  /* 兼容刘海屏 */
+  padding-top: env(safe-area-inset-top, 20px);
+  padding-bottom: env(safe-area-inset-bottom, 20px);
+
+  /* 保证内容居中且不会超出 */
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  max-width: 600px;
+  max-height: 100vh;
+  overflow-y: auto; /* 极端小屏下允许内部滚动 */
+  -webkit-overflow-scrolling: touch;
+}
+
+.title-wrap {
+  margin-bottom: 30px;
+  animation: fadeInDown 1.5s ease-out;
+}
+
+.title-sub {
+  display: block;
+  font-size: 18px;
+  font-weight: 300;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  margin-bottom: 8px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.title-main {
+  display: block;
+  font-size: 54px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #fff, #ff7aa8, #ffd27a);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 10px 30px rgba(255, 77, 141, 0.4);
+  letter-spacing: 0.05em;
+  line-height: 1.1;
+}
+
+.lines {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.line {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 300;
+  line-height: 1.8;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  transform: translateY(20px);
+}
+.line.show {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 1.5s ease,
+    transform 1.5s ease;
+}
+
+.proposal-wrap {
+  margin-top: 40px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 2s ease 0.5s; /* 延迟一点出现 */
+}
+
+.proposal-wrap.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.proposal-svg {
+  width: 200px;
+  height: 150px;
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.3));
+}
+
+.boy path,
+.boy circle,
+.girl path,
+.girl circle {
+  filter: url(#glow);
+}
+
+/* 动画序列 */
+.proposal-wrap.show .boy {
+  animation: slideInLeft 2s ease forwards;
+}
+
+.proposal-wrap.show .girl {
+  animation: slideInRight 2s ease 1s forwards;
+}
+
+/* 跪地动作：使用 step-end 让切换瞬间完成 */
+.boy-stand {
+  opacity: 1;
+}
+.boy-kneel {
+  opacity: 0;
+}
+
+.proposal-wrap.show .boy-stand {
+  animation: fadeOut 0.1s linear 3.5s forwards;
+}
+.proposal-wrap.show .boy-kneel {
+  animation: fadeIn 0.1s linear 3.5s forwards;
+}
+
+/* 手臂动画：伸出 */
+.boy-arm {
+  d: path("M-4,-24 Q0,-20 5,-10"); /* 初始手臂下垂 */
+}
+.proposal-wrap.show .boy-arm {
+  animation: extendArm 2s ease-in-out 3.6s forwards; /* 跪下后开始伸出手臂 */
+}
+
+/* 玫瑰花跟随手臂出现 */
+.rose-in-hand {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.proposal-wrap.show .rose-in-hand {
+  animation: showRose 2s ease-in-out 3.6s forwards;
+}
+
+@keyframes extendArm {
+  0% {
+    d: path("M-4,-24 Q0,-20 5,-10");
+  }
+  100% {
+    d: path("M-4,-24 Q10,-20 28,-22");
+  }
+}
+
+@keyframes showRose {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.5);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(15px, -10px) scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(24px, -16px) scale(1);
+  }
+}
+
+/* 玫瑰花出现 */
+.rose-gift {
+  opacity: 0;
+}
+.proposal-wrap.show .rose-gift {
+  opacity: 1;
+  transition: opacity 1s ease 5.6s; /* 手臂伸直后，大玫瑰花才浮现 */
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translate(20px, 105px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(45px, 105px);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translate(140px, 105px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(115px, 105px);
+  }
+}
+
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+  }
+}
+
+/* 手臂动画 */
+.proposal-wrap.show .boy-arm {
+  animation: extendArm 2s ease-in-out 4s forwards;
+  transform-origin: -4px -24px;
+}
+
+/* 玫瑰花跟随手臂出现 */
+.proposal-wrap.show .rose-in-hand {
+  animation: showRose 2s ease-in-out 4s forwards;
+  transform-origin: center;
+}
+
+@keyframes extendArm {
+  0% {
+    d: path("M-4,-24 Q0,-20 5,-10");
+  }
+  100% {
+    d: path("M-4,-24 Q10,-20 28,-22");
+  }
+}
+
+@keyframes showRose {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.5);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(15px, -10px) scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(25px, -15px) scale(1);
+  }
+}
+
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+.start-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 3, 8, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 20;
+  transition: opacity 1s ease;
+}
+.start-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pulse-btn {
+  background: linear-gradient(135deg, #ff4d8d, #ff7aa8);
+  color: white;
+  border: none;
+  border-radius: 999px;
+  padding: 16px 40px;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  box-shadow:
+    0 0 20px rgba(255, 77, 141, 0.4),
+    0 0 40px rgba(255, 77, 141, 0.2);
+  animation: pulse 2s infinite;
+  transition: transform 0.2s;
+}
+.pulse-btn:active {
+  transform: scale(0.95);
+}
+
+.hint-text {
+  margin-top: 20px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  letter-spacing: 0.05em;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 77, 141, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 20px rgba(255, 77, 141, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 77, 141, 0);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 400px) {
+  .title-main {
+    font-size: 42px;
+  }
+  .line {
+    font-size: 14px;
+  }
+}
+
+@media (max-height: 680px) {
+  .title-main {
+    font-size: 40px;
+  }
+  .proposal-svg {
+    width: 160px;
+    height: 120px;
+  }
+  .proposal-wrap {
+    margin-top: 20px;
+  }
+}
