@@ -14,90 +14,232 @@
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
+    <!-- 照片居中相册层 -->
+    <div id="photoAlbum" class="photo-album-container" aria-hidden="true">
+      <!-- 顶部霓虹心跳连线 -->
+      <div class="heartbeat-container">
+        <svg viewBox="0 0 200 60" class="heartbeat-svg">
+          <path class="heartbeat-line" d="M 20,40 L 70,40 L 85,15 L 100,55 L 115,40 L 145,40" fill="none" stroke="#ff4d8d" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+          <g transform="translate(142, 20)">
+            <path class="heart-symbol" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#ff4d8d" />
+          </g>
+        </svg>
+      </div>
+
+      <div class="photo-frame">
+        <div id="albumSlide1" class="album-slide active"></div>
+        <div id="albumSlide2" class="album-slide"></div>
+      </div>
+    </div>
+    
     <canvas id="fx" aria-hidden="true"></canvas>
 
     <main class="app" aria-label="生日祝福">
       <!-- 顶部控件，极简的音乐按钮 -->
       <header class="top-controls">
-        <button id="muteBtn" class="icon-btn" type="button" aria-label="静音">
-          <span class="icon-text">音乐</span>
+        <button id="muteBtn" class="icon-btn music-btn" type="button" aria-label="静音">
+          <svg class="music-icon" viewBox="0 0 24 24" width="20" height="20">
+            <path d="M9 18V5l12-2v13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="6" cy="18" r="3" fill="currentColor"/>
+            <circle cx="18" cy="16" r="3" fill="currentColor"/>
+          </svg>
+          <span class="music-wave music-wave-1"></span>
+          <span class="music-wave music-wave-2"></span>
+          <span class="music-wave music-wave-3"></span>
         </button>
       </header>
 
       <!-- 浪漫居中内容，直接漂浮在烟花背景上 -->
-      <div class="romantic-content">
-        <div class="title-wrap">
-          <h1 class="title">
-            <span class="title-sub">To 我的宝贝 加加</span>
-            <span class="title-main">Happy Birthday</span>
-          </h1>
-        </div>
+      <div id="textContent" class="romantic-content">
+        <div id="textElements">
+          <div class="title-wrap">
+            <h1 class="title">
+              <span class="title-sub">To 我的宝贝 加加</span>
+              <span class="title-main">Happy Birthday</span>
+            </h1>
+          </div>
 
-        <div class="lines" aria-live="polite" aria-atomic="true">
-          <p class="line" data-line>今天这一天，把所有浪漫都送给你。</p>
-          <p class="line" data-line>愿你的笑容比烟花更绚烂，</p>
-          <p class="line" data-line>愿你的心事被星光轻轻拥抱。</p>
-          <p class="line" data-line>加加，生日快乐！我爱你。</p>
+          <div class="lines" aria-live="polite" aria-atomic="true">
+            <p class="line" data-line>今天这一天，把所有浪漫都送给你。</p>
+            <p class="line" data-line>愿你的笑容比烟花更绚烂，</p>
+            <p class="line" data-line>愿你的心事被星光轻轻拥抱。</p>
+            <p class="line" data-line>加加，生日快乐！我爱你。</p>
+          </div>
         </div>
         
         <!-- 求婚/送花动画容器 -->
         <div class="proposal-wrap">
-          <svg viewBox="0 0 200 150" class="proposal-svg">
-            <defs>
-              <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="1.5" result="blur" />
-                <feComposite in="SourceGraphic" in2="blur" operator="over" />
-              </filter>
-            </defs>
+        <svg viewBox="0 0 200 150" class="proposal-svg">
+            <!-- 不再使用 feGaussianBlur 滤镜，降低 GPU/CPU 压力，避免卡顿 -->
             
             <!-- 男生 (左侧) -->
             <g class="boy" transform="translate(45, 105)">
-              <!-- 头 -->
-              <circle cx="0" cy="-38" r="7" fill="#a5d8ff" />
-              <!-- 站立姿态 -->
+              <!-- 站立姿态（含头部） -->
               <g class="boy-stand">
+                <circle cx="0" cy="-38" r="7" fill="#a5d8ff" />
                 <path d="M-2,-31 L-2,5 L-5,25" stroke="#a5d8ff" stroke-width="2.5" fill="none" stroke-linecap="round" />
                 <path d="M-2,5 L1,25" stroke="#a5d8ff" stroke-width="2.5" fill="none" stroke-linecap="round" />
                 <path d="M-2,-25 L-5,-5" stroke="#a5d8ff" stroke-width="2.5" fill="none" stroke-linecap="round" />
                 <path d="M-2,-25 L1,-5" stroke="#a5d8ff" stroke-width="2.5" fill="none" stroke-linecap="round" />
               </g>
-              <!-- 跪地姿态 (初始隐藏) -->
+              <!-- 跪地姿态（头部下移，单膝跪地，手臂从下方举起献花） -->
               <g class="boy-kneel" style="opacity: 0;">
-                <path d="M-2,-31 Q-8,-15 -8,5 L-8,25" stroke="#a5d8ff" stroke-width="2.5" fill="none" stroke-linecap="round" />
-                <path d="M-8,25 L10,25" stroke="#a5d8ff" stroke-width="2.5" fill="none" stroke-linecap="round" />
-                <path d="M-8,5 Q5,5 12,5 L12,25" stroke="#a5d8ff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
-                <!-- 手臂 (向前送花) 初始在身侧 -->
-                <path class="boy-arm" d="M-4,-24 Q0,-20 5,-10" stroke="#a5d8ff" stroke-width="2.5" fill="none" stroke-linecap="round" />
-                <!-- 玫瑰花：初始隐藏 -->
-                <text class="rose-in-hand" x="5" y="-5" font-size="16" style="opacity: 0;">🌹</text>
+                <circle cx="0" cy="-25" r="7" fill="#a5d8ff" />
+                <!-- 躯干：脖子到臀部，微前倾 -->
+                <path d="M0,-18 L2,2" stroke="#c8e7ff" stroke-width="2.5" fill="none" stroke-linecap="round" />
+                <!-- 后腿：大腿到膝盖着地 -->
+                <path d="M2,2 L-4,18" stroke="#c8e7ff" stroke-width="2.5" fill="none" stroke-linecap="round" />
+                <!-- 后腿：小腿平放地面 -->
+                <path d="M-4,18 L-12,20" stroke="#c8e7ff" stroke-width="2.5" fill="none" stroke-linecap="round" />
+                <!-- 前腿：大腿向前 -->
+                <path d="M2,2 L10,12" stroke="#c8e7ff" stroke-width="2.5" fill="none" stroke-linecap="round" />
+                <!-- 前腿：小腿着地 -->
+                <path d="M10,12 L10,22" stroke="#c8e7ff" stroke-width="2.5" fill="none" stroke-linecap="round" />
+                <!-- 左臂：自然下垂 -->
+                <path d="M0,-14 L-8,0" stroke="#c8e7ff" stroke-width="2.5" fill="none" stroke-linecap="round" />
+                <!-- 右臂：旋转组，初始向下，动画后向上献花 -->
+                <g class="arm-pivot" transform="translate(2,-14)">
+                  <g class="arm-rotate-g">
+                    <path class="boy-arm" d="M0,0 Q12,4 32,0" stroke="#dff3ff" stroke-width="2.5" fill="none" stroke-linecap="round" />
+                    <g class="bouquet-anchor" transform="translate(32,0)">
+                      <g class="bouquet" opacity="0">
+                        <!-- 绿叶从花束四周探出 -->
+                        <path d="M-14,-4 Q-18,-10 -13,-16 Q-10,-9 -14,-4" fill="#2d6a4f" />
+                        <path d="M14,-5 Q18,-12 13,-17 Q10,-10 14,-5" fill="#2d6a4f" />
+                        <path d="M-10,-2 Q-15,-8 -10,-14 Q-7,-7 -10,-2" fill="#3a7d5e" opacity="0.8" />
+                        <path d="M10,-3 Q15,-9 11,-15 Q8,-8 10,-3" fill="#3a7d5e" opacity="0.8" />
+                        <path d="M-6,0 Q-11,-5 -7,-12 Q-4,-5 -6,0" fill="#3a7d5e" opacity="0.6" />
+                        <path d="M7,-1 Q12,-6 8,-13 Q5,-6 7,-1" fill="#3a7d5e" opacity="0.6" />
+                        <path d="M0,1 Q-3,-6 1,-12 Q4,-5 0,1" fill="#408a5c" opacity="0.5" />
+                        <!-- 红玫瑰：底层（大朵，深红） -->
+                        <g class="bouquet-flowers">
+                          <circle cx="-10" cy="-8" r="3.8" fill="#a01020" />
+                          <circle cx="10" cy="-9" r="3.8" fill="#a01020" />
+                          <circle cx="-5" cy="-5" r="3.6" fill="#b81228" />
+                          <circle cx="5" cy="-6" r="3.6" fill="#b81228" />
+                          <circle cx="0" cy="-7" r="3.8" fill="#b01025" />
+                          <!-- 中层（主力花朵，鲜红） -->
+                          <circle cx="-8" cy="-13" r="3.5" fill="#cc1530" />
+                          <circle cx="8" cy="-14" r="3.5" fill="#cc1530" />
+                          <circle cx="-3" cy="-11" r="4" fill="#d41830" />
+                          <circle cx="4" cy="-12" r="4" fill="#d41830" />
+                          <circle cx="0" cy="-14" r="4.2" fill="#cc1530" />
+                          <circle cx="-6" cy="-17" r="3.2" fill="#d41830" />
+                          <circle cx="6" cy="-18" r="3.2" fill="#d41830" />
+                          <!-- 顶层（亮红+花瓣高光，饱满） -->
+                          <circle cx="-2" cy="-18" r="3.6" fill="#e8304a" />
+                          <circle cx="3" cy="-20" r="3.4" fill="#e8304a" />
+                          <circle cx="-4" cy="-22" r="3" fill="#d41830" />
+                          <circle cx="1" cy="-23" r="3.2" fill="#cc1530" />
+                          <circle cx="6" cy="-22" r="2.8" fill="#d41830" />
+                          <circle cx="-7" cy="-20" r="2.6" fill="#cc1530" />
+                          <circle cx="8" cy="-19" r="2.4" fill="#b81228" />
+                          <!-- 花瓣纹理高光 -->
+                          <path d="M-3,-19 Q-2,-21 -1,-19 Q-2,-17 -3,-19" fill="#f04060" opacity="0.7" />
+                          <path d="M2,-21 Q3,-23 4,-21 Q3,-19 2,-21" fill="#f04060" opacity="0.7" />
+                          <path d="M-5,-23 Q-4,-25 -3,-23 Q-4,-21 -5,-23" fill="#e63950" opacity="0.6" />
+                          <path d="M0,-15 Q1,-17 2,-15 Q1,-13 0,-15" fill="#f04060" opacity="0.6" />
+                          <path d="M5,-13 Q6,-15 7,-13 Q6,-11 5,-13" fill="#f04060" opacity="0.5" />
+                          <path d="M-4,-12 Q-3,-14 -2,-12 Q-3,-10 -4,-12" fill="#e63950" opacity="0.5" />
+                        </g>
+                      </g>
+                      <circle class="rose-spark" cx="-16" cy="-20" r="2" fill="#ffffff" />
+                      <circle class="rose-spark rose-spark--b" cx="16" cy="-18" r="1.6" fill="#ffd27a" />
+                      <circle class="rose-spark rose-spark--c" cx="-6" cy="-28" r="1.3" fill="#ffe8f0" />
+                      <circle class="rose-spark rose-spark--d" cx="12" cy="-26" r="1.4" fill="#ffffff" />
+                    </g>
+                  </g>
+                </g>
               </g>
             </g>
 
             <!-- 女生 (右侧) -->
             <g class="girl" transform="translate(115, 105)" style="opacity: 0;">
-               <!-- 头 -->
-               <circle cx="0" cy="-40" r="7" fill="#ffadd2" />
-               <!-- 身体：裙摆线条 -->
-               <path d="M0,-33 Q-6,-15 -10,25" stroke="#ffadd2" stroke-width="2.5" fill="none" stroke-linecap="round" />
-               <path d="M0,-33 Q6,-15 10,25" stroke="#ffadd2" stroke-width="2.5" fill="none" stroke-linecap="round" />
-               <!-- 裙底连线 -->
-               <path d="M-10,25 Q0,28 10,25" stroke="#ffadd2" stroke-width="2.5" fill="none" stroke-linecap="round" />
-               <!-- 手臂 (捂嘴惊喜) -->
-               <path d="M-4,-25 L-8,-18 L0,-30" stroke="#ffadd2" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
-               <path d="M4,-25 L8,-18 L0,-30" stroke="#ffadd2" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+               <circle cx="0" cy="-40" r="7" fill="#ffc8de" />
+               <path d="M0,-33 Q-6,-15 -10,25" stroke="#ffc8de" stroke-width="2.5" fill="none" stroke-linecap="round" />
+               <path d="M0,-33 Q6,-15 10,25" stroke="#ffc8de" stroke-width="2.5" fill="none" stroke-linecap="round" />
+               <path d="M-10,25 Q0,28 10,25" stroke="#ffc8de" stroke-width="2.5" fill="none" stroke-linecap="round" />
+               <path d="M-4,-25 L-8,-18 L0,-30" stroke="#ffc8de" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+               <path d="M4,-25 L8,-18 L0,-30" stroke="#ffc8de" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
             </g>
           </svg>
         </div>
       </div>
 
-      <!-- 开始引导遮罩层，点击后消失 -->
+      <!-- 生日倒计时遮罩层 -->
       <div id="startOverlay" class="start-overlay">
-        <button id="startBtn" class="pulse-btn" type="button">
-          点亮星空，开启浪漫
-        </button>
-        <div class="hint-text"></div>
+        <div class="countdown-intro">
+          <p class="countdown-label">🎂 加加的生日派对即将开始</p>
+          <div id="introCountdown" class="intro-countdown-num">5</div>
+          <div class="countdown-dots">
+            <span class="cd-dot" data-dot="1"></span>
+            <span class="cd-dot" data-dot="2"></span>
+            <span class="cd-dot" data-dot="3"></span>
+            <span class="cd-dot" data-dot="4"></span>
+            <span class="cd-dot" data-dot="5"></span>
+          </div>
+          <button id="goBtn" class="go-btn" type="button" style="display:none;">
+            <svg viewBox="0 0 48 48" width="56" height="56">
+              <circle cx="24" cy="24" r="23" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+              <path d="M16 16l8 8-8 8" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M26 16l8 8-8 8" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
       </div>
     </main>
+
+    <!-- 蛋糕终幕场景 -->
+    <section id="cakeScene" class="cake-scene" aria-label="生日蛋糕">
+      <div class="cake-wrapper">
+        <!-- 蜡烛区域 -->
+        <div class="candles">
+          <div class="candle"><div class="flame"></div></div>
+          <div class="candle candle-tall"><div class="flame flame-alt"></div></div>
+          <div class="candle"><div class="flame"></div></div>
+          <div class="candle candle-tall"><div class="flame flame-alt"></div></div>
+          <div class="candle"><div class="flame"></div></div>
+        </div>
+        <!-- 蛋糕主体 -->
+        <div class="cake">
+          <div class="cake-top">
+            <div class="drip drip-1"></div>
+            <div class="drip drip-2"></div>
+            <div class="drip drip-3"></div>
+            <div class="drip drip-4"></div>
+            <div class="drip drip-5"></div>
+          </div>
+          <div class="cake-middle"></div>
+          <div class="cake-bottom">
+            <div class="drip drip-b1"></div>
+            <div class="drip drip-b2"></div>
+            <div class="drip drip-b3"></div>
+          </div>
+          <div class="cake-base"></div>
+          <div class="cake-board"></div>
+        </div>
+        <!-- 装饰星星 -->
+        <div class="cake-stars">
+          <span class="star star-1">&#10022;</span>
+          <span class="star star-2">&#10022;</span>
+          <span class="star star-3">&#10022;</span>
+          <span class="star star-4">&#10022;</span>
+          <span class="star star-5">&#10022;</span>
+          <span class="star star-6">&#10022;</span>
+        </div>
+      </div>
+      <h2 class="cake-title">加加<em>25</em>岁生日快乐</h2>
+      <p class="cake-sub">Make a wish & blow out the candles</p>
+      <!-- 倒计时提示 -->
+      <div id="blowCountdown" class="blow-countdown" aria-hidden="true">
+        <p class="blow-hint">准备好许愿吹蜡烛啦</p>
+        <span id="countdownNum" class="countdown-num">3</span>
+      </div>
+      <!-- 重播按钮 -->
+      <button id="replayBtn" class="replay-btn" type="button" style="display:none;">
+        好感动 我要再看一次
+      </button>
+    </section>
 
     <audio id="bgm" preload="auto" loop playsinline webkit-playsinline>
       <source src="./assets/music.mp3" type="audio/mpeg" />

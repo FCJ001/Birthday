@@ -98,18 +98,20 @@ const FX = (() => {
     const rgb = paletteList[(Math.random() * paletteList.length) | 0];
     for (let i = 0; i < m; i++) {
       const a = (i / m) * Math.PI * 2 + rand(-0.12, 0.12);
-      const s = rand(2.0, 8.5); // 增加爆炸范围上限
+      const s = rand(2.8, 11.2); // 拉大爆炸半径，更有“烟花感”
       sparks.push({
         x: cx,
         y: cy,
         vx: Math.cos(a) * s,
         vy: Math.sin(a) * s,
-        r: rand(1.2, 2.0),
-        a: rand(0.6, 0.9),
+        px: cx,
+        py: cy,
+        r: rand(1.8, 3.8), // 粒子更粗
+        a: rand(0.82, 1.0), // 初始更亮
         rgb,
-        life: rand(40, 70),
+        life: rand(48, 86),
         age: 0,
-        gravity: rand(0.02, 0.05),
+        gravity: rand(0.028, 0.058),
       });
     }
   }
@@ -126,8 +128,23 @@ const FX = (() => {
   }
 
   function drawSpark(p) {
+    // 拖尾：先画上一帧到当前帧的线段
+    ctx.strokeStyle = rgba(p.rgb, p.a * 0.45);
+    ctx.lineWidth = Math.max(1, p.r * 0.55);
     ctx.beginPath();
-    ctx.fillStyle = rgba(p.rgb, p.a);
+    ctx.moveTo(p.px, p.py);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+
+    // 外层光晕
+    ctx.beginPath();
+    ctx.fillStyle = rgba(p.rgb, p.a * 0.34);
+    ctx.arc(p.x, p.y, p.r * 2.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 内核高亮
+    ctx.beginPath();
+    ctx.fillStyle = rgba(p.rgb, Math.min(1, p.a));
     ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
     ctx.fill();
   }
@@ -213,12 +230,14 @@ const FX = (() => {
     // Sparks
     for (let i = sparks.length - 1; i >= 0; i--) {
       const p = sparks[i];
+      p.px = p.x;
+      p.py = p.y;
       p.x += p.vx;
       p.y += p.vy;
       p.age++;
       p.vy += p.gravity ?? 0;
-      p.a *= 0.985;
-      p.r *= 0.995;
+      p.a *= 0.989;
+      p.r *= 0.997;
       
       if (p.age >= p.life) {
         sparks.splice(i, 1);
@@ -302,11 +321,10 @@ const FX = (() => {
       burstHeart(rand(w * 0.1, w * 0.9), rand(h * 0.15, h * 0.85), rand(10, 16));
     }
 
-    // 必定绽放 1-2 个烟花
+    // 必定绽放 2-3 个烟花，确保可见
     burstFirework(rand(w * 0.1, w * 0.9), rand(h * 0.15, h * 0.85));
-    if (Math.random() < 0.6) {
-      burstFirework(rand(w * 0.1, w * 0.9), rand(h * 0.15, h * 0.85));
-    }
+    burstFirework(rand(w * 0.1, w * 0.9), rand(h * 0.15, h * 0.85));
+    if (Math.random() < 0.78) burstFirework(rand(w * 0.1, w * 0.9), rand(h * 0.15, h * 0.85));
   }
 
   function tapBurst(x, y) {
@@ -326,29 +344,118 @@ const FX = (() => {
 })();
 
 const App = (() => {
-  const startBtn = document.getElementById("startBtn");
   const startOverlay = document.getElementById("startOverlay");
+  const introCountdown = document.getElementById("introCountdown");
+  const cdDots = Array.from(document.querySelectorAll(".cd-dot"));
+  const goBtn = document.getElementById("goBtn");
   const muteBtn = document.getElementById("muteBtn");
   const bgm = document.getElementById("bgm");
   const lines = Array.from(document.querySelectorAll("[data-line]"));
   const proposalWrap = document.querySelector(".proposal-wrap");
 
+  const cakeScene = document.getElementById("cakeScene");
+  const blowCountdown = document.getElementById("blowCountdown");
+  const countdownNum = document.getElementById("countdownNum");
+  const replayBtn = document.getElementById("replayBtn");
+
   let started = false;
   let muted = false;
-  let fireworksStopped = false; // 新增状态：烟花是否已停止
+  let fireworksStopped = false;
   let revealTimer = null;
   let burstTimer = null;
+  let photoTimer = null;
+  let photosShown = 0;
+
+  /** 中文文件名需编码，避免部分环境加载失败 */
+  function imageSrc(path) {
+    const i = path.lastIndexOf("/");
+    if (i < 0) return encodeURI(path);
+    return path.slice(0, i + 1) + encodeURIComponent(path.slice(i + 1));
+  }
+
+  function getPhotoMaxEdge() {
+    const vw = window.innerWidth || 1080;
+    const vh = window.innerHeight || 1920;
+    // 以屏幕长边约 1.8 倍作为上限，保证清晰同时减少解码/内存压力
+    return Math.min(2200, Math.round(Math.max(vw, vh) * 1.8));
+  }
+
+  function getDisplayPhotoUrl(index) {
+    const raw = photoUrls[index];
+    return optimizedPhotoUrls.get(raw) || imageSrc(raw);
+  }
+
+  async function optimizePhoto(url) {
+    const src = imageSrc(url);
+    const img = new Image();
+    img.decoding = "async";
+    img.src = src;
+    await img.decode();
+
+    const w = img.naturalWidth || 0;
+    const h = img.naturalHeight || 0;
+    if (!w || !h) return src;
+
+    const maxEdge = getPhotoMaxEdge();
+    const longEdge = Math.max(w, h);
+    if (longEdge <= maxEdge) return src;
+
+    const scale = maxEdge / longEdge;
+    const tw = Math.max(1, Math.round(w * scale));
+    const th = Math.max(1, Math.round(h * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = tw;
+    canvas.height = th;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return src;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(img, 0, 0, tw, th);
+
+    const blob = await new Promise((resolve) => {
+      canvas.toBlob(resolve, "image/jpeg", 0.92);
+    });
+    if (!blob) return src;
+    const objUrl = URL.createObjectURL(blob);
+    generatedObjectUrls.push(objUrl);
+    return objUrl;
+  }
+
+  // 新增图片排在最前，再接 1.jpg … 20.jpg
+  const PHOTOS_FIRST = [
+    "./assets/images/微信图片_20260321225952_183_177.jpg",
+    "./assets/images/微信图片_20260321230042_184_177.jpg",
+    "./assets/images/微信图片_20260321230125_185_177.jpg",
+  ];
+  const photoUrls = [
+    ...PHOTOS_FIRST,
+    ...Array.from({ length: 20 }, (_, i) => `./assets/images/${i + 1}.jpg`),
+  ];
+  const optimizedPhotoUrls = new Map();
+  const generatedObjectUrls = [];
+  let currentPhotoIndex = 0;
+  const photoAlbum = document.getElementById("photoAlbum");
+  const slide1 = document.getElementById("albumSlide1");
+  const slide2 = document.getElementById("albumSlide2");
+  const textElements = document.getElementById("textElements");
 
   function setMute(nextMuted) {
     muted = nextMuted;
     muteBtn.setAttribute("aria-pressed", String(muted));
     bgm.muted = muted;
+    if (muted) {
+      muteBtn.classList.remove("playing");
+    } else if (!bgm.paused) {
+      muteBtn.classList.add("playing");
+    }
   }
 
   async function tryPlayBgm() {
     if (!bgm) return false;
     try {
       await bgm.play();
+      if (!muted) muteBtn.classList.add("playing");
       return true;
     } catch {
       return false;
@@ -385,8 +492,258 @@ const App = (() => {
         FX.startRoseRain();
         // 显示求婚动画
         if (proposalWrap) proposalWrap.classList.add("show");
+
+        // 文字结束后稍作停留，再开始播放照片（缩短等待）
+        setTimeout(() => {
+          startPhotoSlideshow();
+        }, 3200);
       }
     }, 2800); // 节奏放慢到 2.8 秒，更深情
+  }
+
+  function startPhotoSlideshow() {
+    if (!photoAlbum || photoUrls.length === 0) return;
+
+    // 隐去文字内容
+    if (textElements) {
+      textElements.classList.add("fade-out");
+    }
+
+    // 等待文字消失后，显示相册并开始轮播
+    setTimeout(() => {
+      photoAlbum.classList.add("show");
+      
+      // 第一张照片：保留底部求婚动画，隐藏顶部心跳
+      photoAlbum.classList.add("hide-heartbeat");
+      if (proposalWrap) {
+        proposalWrap.classList.remove("hide");
+        proposalWrap.classList.add("show");
+      }
+      
+      // 设置第一张图片
+      slide1.style.backgroundImage = `url('${getDisplayPhotoUrl(currentPhotoIndex)}')`;
+
+      let isSlide1Active = true;
+      let isHeartbeatTurn = false;
+      photosShown = 1;
+
+      photoTimer = window.setInterval(() => {
+        currentPhotoIndex++;
+        photosShown++;
+
+        if (currentPhotoIndex >= photoUrls.length) {
+          clearInterval(photoTimer);
+          photoTimer = null;
+          showCakeScene();
+          return;
+        }
+
+        const nextImageUrl = `url('${getDisplayPhotoUrl(currentPhotoIndex)}')`;
+
+        if (isSlide1Active) {
+          slide2.style.backgroundImage = nextImageUrl;
+          slide2.classList.add("active");
+          slide1.classList.remove("active");
+        } else {
+          slide1.style.backgroundImage = nextImageUrl;
+          slide1.classList.add("active");
+          slide2.classList.remove("active");
+        }
+        isSlide1Active = !isSlide1Active;
+
+        isHeartbeatTurn = !isHeartbeatTurn;
+        if (isHeartbeatTurn) {
+          if (proposalWrap) proposalWrap.classList.add("hide");
+          photoAlbum.classList.remove("hide-heartbeat");
+          photoAlbum.classList.remove("show-heartbeat");
+          void photoAlbum.offsetWidth;
+          photoAlbum.classList.add("show-heartbeat");
+        } else {
+          photoAlbum.classList.remove("show-heartbeat");
+          photoAlbum.classList.add("hide-heartbeat");
+          if (proposalWrap) proposalWrap.classList.remove("hide");
+        }
+
+      }, 5000);
+    }, 2000);
+  }
+
+  function showCakeScene() {
+    // 淡出相册和求婚动画
+    if (photoAlbum) {
+      photoAlbum.style.transition = "opacity 2s ease-in-out";
+      photoAlbum.style.opacity = "0";
+    }
+    if (proposalWrap) {
+      proposalWrap.style.transition = "opacity 2s ease-in-out";
+      proposalWrap.style.opacity = "0";
+    }
+    FX.stopRoseRain();
+
+    setTimeout(() => {
+      if (photoAlbum) photoAlbum.style.display = "none";
+      if (proposalWrap) proposalWrap.style.display = "none";
+
+      // 淡入蛋糕场景，停止烟花，安静等待吹蜡烛
+      if (cakeScene) cakeScene.classList.add("show");
+      clearInterval(burstTimer);
+      burstTimer = null;
+
+      // 蛋糕展示 5 秒后，开始吹蜡烛倒计时
+      setTimeout(() => startBlowCountdown(), 5000);
+    }, 2200);
+  }
+
+  function startBlowCountdown() {
+    if (!blowCountdown || !countdownNum) return;
+    blowCountdown.classList.add("show");
+    let count = 5;
+    countdownNum.textContent = count;
+
+    const cdTimer = setInterval(() => {
+      count--;
+      if (count > 0) {
+        countdownNum.textContent = count;
+      } else {
+        clearInterval(cdTimer);
+        countdownNum.textContent = "🎂";
+        blowCountdown.classList.remove("show");
+        blowOutCandles();
+      }
+    }, 1000);
+  }
+
+  function blowOutCandles() {
+    const flames = cakeScene.querySelectorAll(".flame");
+    const candles = cakeScene.querySelectorAll(".candle");
+
+    flames.forEach((flame, i) => {
+      setTimeout(() => {
+        flame.classList.add("out");
+        // 加一缕烟
+        const smoke = document.createElement("div");
+        smoke.className = "smoke";
+        candles[i].appendChild(smoke);
+        requestAnimationFrame(() => smoke.classList.add("show"));
+      }, i * 200);
+    });
+
+    // 全部熄灭后放庆祝烟花，再显示重播按钮
+    const totalDelay = flames.length * 200 + 600;
+    setTimeout(() => {
+      FX.romanticBurst();
+      setTimeout(() => FX.romanticBurst(), 300);
+      setTimeout(() => FX.romanticBurst(), 600);
+      setTimeout(() => FX.romanticBurst(), 1000);
+      setTimeout(() => FX.romanticBurst(), 1800);
+
+      burstTimer = window.setInterval(() => {
+        FX.romanticBurst();
+      }, 3000);
+    }, totalDelay);
+
+    setTimeout(() => {
+      showReplayBtn();
+    }, totalDelay + 4000);
+  }
+
+  function showReplayBtn() {
+    if (!replayBtn) return;
+    replayBtn.style.display = "";
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => replayBtn.classList.add("show"));
+    });
+  }
+
+  function resetAll() {
+    // 清除所有定时器
+    clearInterval(revealTimer);
+    clearInterval(burstTimer);
+    clearInterval(photoTimer);
+    revealTimer = null;
+    burstTimer = null;
+    photoTimer = null;
+
+    // 重置状态
+    started = false;
+    fireworksStopped = false;
+    photosShown = 0;
+    currentPhotoIndex = 0;
+
+    // 重置文字
+    lines.forEach((el) => el.classList.remove("show"));
+    if (textElements) {
+      textElements.classList.remove("fade-out");
+    }
+
+    // 重置求婚动画
+    if (proposalWrap) {
+      proposalWrap.style.transition = "";
+      proposalWrap.style.opacity = "";
+      proposalWrap.style.display = "";
+      proposalWrap.classList.remove("show", "hide");
+    }
+
+    // 重置相册
+    if (photoAlbum) {
+      photoAlbum.style.transition = "";
+      photoAlbum.style.opacity = "";
+      photoAlbum.style.display = "";
+      photoAlbum.classList.remove("show", "show-heartbeat", "hide-heartbeat");
+    }
+    if (slide1) {
+      slide1.style.backgroundImage = "";
+      slide1.classList.add("active");
+    }
+    if (slide2) {
+      slide2.style.backgroundImage = "";
+      slide2.classList.remove("active");
+    }
+
+    // 重置蛋糕场景：立即隐藏，禁用渐变
+    if (cakeScene) {
+      cakeScene.style.transition = "none";
+      cakeScene.classList.remove("show");
+      cakeScene.offsetHeight; // 强制重绘使 transition:none 生效
+      cakeScene.style.transition = "";
+      cakeScene.querySelectorAll(".flame").forEach((f) => f.classList.remove("out"));
+      cakeScene.querySelectorAll(".smoke").forEach((s) => s.remove());
+    }
+
+    // 隐藏倒计时和重播按钮
+    if (blowCountdown) blowCountdown.classList.remove("show");
+    if (replayBtn) {
+      replayBtn.classList.remove("show");
+      replayBtn.style.display = "none";
+    }
+
+    // 停止玫瑰雨
+    FX.stopRoseRain();
+
+    // 显示开始遮罩并重置倒计时
+    if (startOverlay) startOverlay.classList.remove("hidden");
+    if (introCountdown) {
+      introCountdown.textContent = "5";
+      introCountdown.classList.remove("go-text", "pop");
+    }
+    cdDots.forEach((d) => d.classList.remove("lit"));
+    if (goBtn) {
+      goBtn.style.display = "none";
+      goBtn.classList.remove("show");
+    }
+
+    // 音乐回到开头
+    muteBtn.classList.remove("playing");
+    if (bgm) {
+      bgm.currentTime = 0;
+      bgm.pause();
+    }
+  }
+
+  async function onReplay() {
+    resetAll();
+    await new Promise((r) => setTimeout(r, 600));
+    runIntroCountdown();
   }
 
   function startRomance() {
@@ -411,7 +768,49 @@ const App = (() => {
     setTimeout(() => FX.romanticBurst(), 500);
   }
 
-  async function onStart() {
+  function runIntroCountdown() {
+    if (!introCountdown) return;
+    let count = 5;
+    introCountdown.textContent = count;
+
+    cdDots.forEach((d) => d.classList.remove("lit"));
+    if (goBtn) {
+      goBtn.style.display = "none";
+      goBtn.classList.remove("show");
+    }
+
+    const cdInterval = setInterval(() => {
+      cdDots[5 - count]?.classList.add("lit");
+      count--;
+
+      if (count > 0) {
+        introCountdown.textContent = count;
+        introCountdown.classList.remove("pop");
+        void introCountdown.offsetWidth;
+        introCountdown.classList.add("pop");
+      } else {
+        clearInterval(cdInterval);
+        cdDots[4]?.classList.add("lit");
+        introCountdown.textContent = "🎉";
+        introCountdown.classList.remove("pop");
+        introCountdown.classList.add("go-text");
+        void introCountdown.offsetWidth;
+        introCountdown.classList.add("pop");
+
+        setTimeout(() => showGoBtn(), 600);
+      }
+    }, 1000);
+  }
+
+  function showGoBtn() {
+    if (!goBtn) return;
+    goBtn.style.display = "flex";
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => goBtn.classList.add("show"));
+    });
+  }
+
+  async function onGoClick() {
     await tryPlayBgm();
     startRomance();
   }
@@ -431,7 +830,6 @@ const App = (() => {
         const x = e.clientX;
         const y = e.clientY;
         FX.tapBurst(x, y);
-        if (!started) onStart();
       },
       { passive: true }
     );
@@ -441,10 +839,13 @@ const App = (() => {
     FX.init();
     setMute(false);
 
-    if (startBtn) startBtn.addEventListener("click", onStart);
     if (muteBtn) muteBtn.addEventListener("click", onMute);
+    if (goBtn) goBtn.addEventListener("click", onGoClick);
+    if (replayBtn) replayBtn.addEventListener("click", onReplay);
     bindCanvasTap();
     bindWeChatAudioFix();
+
+    runIntroCountdown();
 
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
@@ -454,11 +855,37 @@ const App = (() => {
         burstTimer = window.setInterval(() => FX.romanticBurst(), 1200);
       }
     });
+
+    window.addEventListener("beforeunload", () => {
+      generatedObjectUrls.forEach((u) => URL.revokeObjectURL(u));
+    });
   }
 
-  return { init };
+  // 预加载所有图片，防止切换时白屏
+  async function preloadImages() {
+    await Promise.all(
+      photoUrls.map(async (url) => {
+        try {
+          const optimized = await optimizePhoto(url);
+          optimizedPhotoUrls.set(url, optimized);
+          const img = new Image();
+          img.decoding = "async";
+          img.src = optimized;
+        } catch {
+          const fallback = imageSrc(url);
+          optimizedPhotoUrls.set(url, fallback);
+          const img = new Image();
+          img.decoding = "async";
+          img.src = fallback;
+        }
+      })
+    );
+  }
+
+  return { init, preloadImages };
 })();
 
 window.addEventListener("DOMContentLoaded", () => {
+  App.preloadImages();
   App.init();
 });
