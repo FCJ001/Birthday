@@ -365,6 +365,7 @@ const App = (() => {
   let burstTimer = null;
   let photoTimer = null;
   let photosShown = 0;
+  let animAppearanceCount = 0;
 
   /** 中文文件名需编码，避免部分环境加载失败 */
   function imageSrc(path) {
@@ -501,6 +502,41 @@ const App = (() => {
     }, 2800); // 节奏放慢到 2.8 秒，更深情
   }
 
+  function positionProposalBelowPhoto() {
+    if (!proposalWrap || !photoAlbum || !proposalWrap.classList.contains("photo-mode")) return;
+    const rect = photoAlbum.getBoundingClientRect();
+    const vh = window.innerHeight;
+    const pH = proposalWrap.getBoundingClientRect().height || 150;
+    const top = Math.min(rect.bottom + 10, vh - pH - 8);
+    proposalWrap.style.top = Math.round(top) + "px";
+  }
+
+  function getSceneForAppearance(count) {
+    const totalSlots = Math.ceil(photoUrls.length / 2);
+    const proposalSlots = Math.ceil(totalSlots / 3);
+    const embraceSlots = Math.ceil((totalSlots - proposalSlots) / 2);
+    if (count < proposalSlots) return "proposal";
+    if (count < proposalSlots + embraceSlots) return "embrace";
+    return "walk";
+  }
+
+  function replayProposalAnimation() {
+    if (!proposalWrap) return;
+    const scene = getSceneForAppearance(animAppearanceCount);
+    proposalWrap.setAttribute("data-scene", scene);
+    animAppearanceCount++;
+
+    proposalWrap.style.transition = "none";
+    proposalWrap.style.opacity = "1";
+    proposalWrap.classList.remove("show");
+    void proposalWrap.offsetWidth;
+    proposalWrap.classList.add("show");
+    requestAnimationFrame(() => {
+      proposalWrap.style.transition = "";
+      proposalWrap.style.opacity = "";
+    });
+  }
+
   function startPhotoSlideshow() {
     if (!photoAlbum || photoUrls.length === 0) return;
 
@@ -516,8 +552,13 @@ const App = (() => {
       // 第一张照片：保留底部求婚动画，隐藏顶部心跳
       photoAlbum.classList.add("hide-heartbeat");
       if (proposalWrap) {
+        document.body.appendChild(proposalWrap);
         proposalWrap.classList.remove("hide");
-        proposalWrap.classList.add("show");
+        proposalWrap.classList.add("photo-mode");
+        animAppearanceCount = 0;
+        positionProposalBelowPhoto();
+        replayProposalAnimation();
+        window.addEventListener("resize", positionProposalBelowPhoto);
       }
       
       // 设置第一张图片
@@ -561,7 +602,10 @@ const App = (() => {
         } else {
           photoAlbum.classList.remove("show-heartbeat");
           photoAlbum.classList.add("hide-heartbeat");
-          if (proposalWrap) proposalWrap.classList.remove("hide");
+          if (proposalWrap) {
+            proposalWrap.classList.remove("hide");
+            replayProposalAnimation();
+          }
         }
 
       }, 5000);
@@ -669,6 +713,7 @@ const App = (() => {
     fireworksStopped = false;
     photosShown = 0;
     currentPhotoIndex = 0;
+    animAppearanceCount = 0;
 
     // 重置文字
     lines.forEach((el) => el.classList.remove("show"));
@@ -676,12 +721,19 @@ const App = (() => {
       textElements.classList.remove("fade-out");
     }
 
-    // 重置求婚动画
+    // 重置求婚动画（移回原始父容器）
     if (proposalWrap) {
+      window.removeEventListener("resize", positionProposalBelowPhoto);
       proposalWrap.style.transition = "";
       proposalWrap.style.opacity = "";
       proposalWrap.style.display = "";
-      proposalWrap.classList.remove("show", "hide");
+      proposalWrap.style.top = "";
+      proposalWrap.classList.remove("show", "hide", "photo-mode");
+      proposalWrap.setAttribute("data-scene", "proposal");
+      const romanticContent = document.getElementById("textContent");
+      if (romanticContent && proposalWrap.parentNode !== romanticContent) {
+        romanticContent.appendChild(proposalWrap);
+      }
     }
 
     // 重置相册

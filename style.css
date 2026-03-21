@@ -41,13 +41,12 @@ body {
    ========================== */
 .photo-album-container {
   position: absolute;
-  /* 往上移一点，给底部求婚动画留出空间 */
-  top: 42%;
+  top: 38%;
   left: 50%;
   transform: translate(-50%, -50%);
   width: 85%;
   max-width: 360px;
-  /* 稍微调整高度比例，不要太长 */
+  max-width: min(360px, 40vh);
   aspect-ratio: 4 / 5;
   z-index: 10;
   opacity: 0;
@@ -401,11 +400,38 @@ body {
   opacity: 0;
 }
 
-.proposal-svg {
+/* 照片轮播期间，求婚动画脱离 .romantic-content 移至 body，fixed 定位到照片下方（top 由 JS 计算） */
+.proposal-wrap.photo-mode {
+  position: fixed;
+  left: 0;
+  right: 0;
+  margin-top: 0;
+  z-index: 11;
+  transform: none;
+  transition: opacity 1s ease-in-out;
+}
+
+.proposal-wrap.photo-mode.show {
+  opacity: 1;
+  transform: none;
+}
+
+.proposal-wrap.photo-mode.hide {
+  opacity: 0;
+}
+
+.scene-svg {
   width: 200px;
   height: 150px;
   filter: drop-shadow(0 2px 8px rgba(255, 255, 255, 0.12));
   contain: layout style paint;
+  display: none;
+}
+
+.proposal-wrap[data-scene="proposal"] .proposal-svg,
+.proposal-wrap[data-scene="embrace"] .embrace-svg,
+.proposal-wrap[data-scene="walk"] .walk-svg {
+  display: block;
 }
 
 /* 动画序列 */
@@ -603,7 +629,12 @@ body {
 }
 
 .intro-countdown-num.go-text {
-  font-size: 48px;
+  font-size: 72px;
+  background: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  color: inherit;
+  filter: drop-shadow(0 4px 16px rgba(255, 210, 122, 0.5));
   animation: countdownPop 0.8s ease-in-out;
 }
 
@@ -1042,7 +1073,7 @@ body {
   .title-main {
     font-size: 40px;
   }
-  .proposal-svg {
+  .scene-svg {
     width: 160px;
     height: 120px;
   }
@@ -1053,4 +1084,87 @@ body {
   .cake-scene.show .cake-wrapper { transform: scale(0.85) translateY(0); }
   .cake-title { font-size: 28px; }
   .cake-title em { font-size: 36px; }
+}
+
+@media (max-height: 580px) {
+  .photo-album-container {
+    top: 35%;
+    max-width: min(300px, 36vh);
+  }
+  .proposal-wrap.photo-mode .scene-svg {
+    width: 140px;
+    height: 105px;
+  }
+}
+
+/* ==========================
+   Scene 2: 拥抱动画
+   ========================== */
+.proposal-wrap.show[data-scene="embrace"] .emb-boy {
+  animation: embBoyIn 2.5s ease forwards;
+}
+.proposal-wrap.show[data-scene="embrace"] .emb-girl {
+  animation: embGirlIn 2.5s ease 0.5s forwards;
+}
+.proposal-wrap.show[data-scene="embrace"] .emb-heart {
+  animation: embHeartPop 0.8s cubic-bezier(.17,.67,.35,1.5) 3s forwards;
+}
+.proposal-wrap.show[data-scene="embrace"] .emb-spark {
+  animation: roseTwinkle 1.05s ease-in-out 3.5s infinite;
+}
+.emb-spark-b { animation-delay: 3.7s !important; }
+.emb-spark-c { animation-delay: 3.9s !important; }
+
+@keyframes embBoyIn {
+  0%   { opacity: 0; transform: translate(15px, 105px); }
+  35%  { opacity: 1; transform: translate(40px, 105px); }
+  100% { opacity: 1; transform: translate(88px, 105px); }
+}
+
+@keyframes embGirlIn {
+  0%   { opacity: 0; transform: translate(185px, 105px); }
+  35%  { opacity: 1; transform: translate(160px, 105px); }
+  100% { opacity: 1; transform: translate(112px, 105px); }
+}
+
+@keyframes embHeartPop {
+  0%   { opacity: 0; transform: scale(0); }
+  60%  { opacity: 1; transform: scale(1.3); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* ==========================
+   Scene 3: 并肩行走动画
+   ========================== */
+.proposal-wrap.show[data-scene="walk"] .wlk-couple {
+  animation: wlkCoupleIn 2.5s ease forwards;
+}
+.proposal-wrap.show[data-scene="walk"] .wlk-bob {
+  animation: wlkBob 1s ease-in-out 2.5s infinite alternate;
+}
+.proposal-wrap.show[data-scene="walk"] .wlk-hearts {
+  animation: fadeIn 0.5s ease 3s forwards;
+}
+.proposal-wrap.show[data-scene="walk"] .wlk-h {
+  animation: wlkHeartFloat 3s ease-in-out infinite;
+}
+.wlk-h2 { animation-delay: 1s !important; }
+.wlk-h3 { animation-delay: 2s !important; }
+
+@keyframes wlkCoupleIn {
+  0%   { opacity: 0; transform: translate(20px, 105px); }
+  40%  { opacity: 1; }
+  100% { opacity: 1; transform: translate(100px, 105px); }
+}
+
+@keyframes wlkBob {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-3px); }
+}
+
+@keyframes wlkHeartFloat {
+  0%, 100% { opacity: 0; transform: translateY(0); }
+  20%  { opacity: 0.8; }
+  50%  { opacity: 0.6; transform: translateY(-12px); }
+  80%  { opacity: 0; }
 }
