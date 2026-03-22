@@ -783,6 +783,81 @@ const App = (() => {
     yanhuaSfx.play().catch(() => {});
   }
 
+  /** 不在此处 load()，避免清空已缓冲数据导致断续 */
+  function waitUntilBgmBuffered(minSecondsAhead, timeoutMs) {
+    if (!bgm) return Promise.resolve();
+    return new Promise((resolve) => {
+      const enough = () => {
+        try {
+          if (bgm.readyState >= 4) return true;
+          const b = bgm.buffered;
+          if (b.length) {
+            const end = b.end(b.length - 1);
+            const ahead = end - bgm.currentTime;
+            if (ahead >= minSecondsAhead) return true;
+          }
+        } catch {
+          /* ignore */
+        }
+        return false;
+      };
+      if (enough()) {
+        resolve();
+        return;
+      }
+      let t;
+      const cleanup = () => {
+        clearTimeout(t);
+        bgm.removeEventListener("progress", onProg);
+        bgm.removeEventListener("canplaythrough", onThrough);
+        bgm.removeEventListener("error", onErr);
+      };
+      const done = () => {
+        cleanup();
+        resolve();
+      };
+      const onProg = () => {
+        if (enough()) done();
+      };
+      const onThrough = () => done();
+      const onErr = () => done();
+      bgm.addEventListener("progress", onProg);
+      bgm.addEventListener("canplaythrough", onThrough, { once: true });
+      bgm.addEventListener("error", onErr, { once: true });
+      t = window.setTimeout(done, timeoutMs);
+    });
+  }
+
+  /**
+   * 必须在点击等用户手势的同步调用栈里执行 play()，否则 iOS/微信会拒播。
+   * 同时把 preload 提到 auto 并 load()，尽快拉数据减少播放中欠载。
+   */
+  function playBgmInUserGesture() {
+    if (!bgm || muted) return;
+    try {
+      bgm.setAttribute("preload", "auto");
+      if (bgm.readyState < 3) {
+        bgm.load();
+      }
+    } catch {
+      /* ignore */
+    }
+    const p = bgm.play();
+    if (p !== undefined) {
+      p
+        .then(() => {
+          if (!muted) muteBtn.classList.add("playing");
+        })
+        .catch((e) => {
+          if (e && e.name === "NotAllowedError") return;
+          void tryPlayBgmAfterBuffer();
+        });
+    } else if (!muted) {
+      muteBtn.classList.add("playing");
+    }
+  }
+
+  /** 非手势场景（如 WeixinJSBridge）或手势内 play 失败后：等缓冲再播，绝不 load() 重置 */
   async function tryPlayBgm() {
     if (!bgm) return false;
     try {
@@ -790,27 +865,30 @@ const App = (() => {
       if (!muted) muteBtn.classList.add("playing");
       return true;
     } catch (e) {
-      // 未在用户手势内（如仅 WeixinJSBridgeReady）时浏览器会拒绝播放
       if (e && e.name === "NotAllowedError") return false;
-      // 元数据预载后数据不足等：load 再等 canplay 后重试一次
-      await new Promise((resolve) => {
-        const done = () => resolve();
-        bgm.addEventListener("canplay", done, { once: true });
-        bgm.addEventListener("error", done, { once: true });
-        try {
-          bgm.load();
-        } catch {
-          done();
-        }
-      });
-      try {
-        await bgm.play();
-        if (!muted) muteBtn.classList.add("playing");
-        return true;
-      } catch {
-        return false;
-      }
+      return tryPlayBgmAfterBuffer();
     }
+  }
+
+  async function tryPlayBgmAfterBuffer() {
+    if (!bgm) return false;
+    bgm.setAttribute("preload", "auto");
+    await waitUntilBgmBuffered(12, 15000);
+    try {
+      await bgm.play();
+      if (!muted) muteBtn.classList.add("playing");
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function bindBgmWaitingResume() {
+    if (!bgm) return;
+    bgm.addEventListener("waiting", () => {
+      if (muted) return;
+      bgm.play().catch(() => {});
+    });
   }
 
   /** 用户已交互后再在空闲时拉全量 yanhua，避免与首屏图片抢带宽，终幕时减少卡顿 */
@@ -835,7 +913,17 @@ const App = (() => {
       "WeixinJSBridgeReady",
       () => {
         if (!muted) {
-          tryPlayBgm();
+          try {
+            if (bgm) {
+              bgm.setAttribute("preload", "auto");
+              if (bgm.readyState < 3) {
+                bgm.load();
+              }
+            }
+          } catch {
+            /* ignore */
+          }
+          void tryPlayBgm();
           primeYanhuaForMobile();
           warmLoadYanhuaFull();
         }
@@ -1237,17 +1325,17 @@ const App = (() => {
     });
   }
 
-  async function onGoClick() {
-    await tryPlayBgm();
+  function onGoClick() {
     primeYanhuaForMobile();
     warmLoadYanhuaFull();
+    playBgmInUserGesture();
     startRomance();
   }
 
   function onMute() {
     setMute(!muted);
     if (!muted) {
-      tryPlayBgm();
+      playBgmInUserGesture();
       primeYanhuaForMobile();
       warmLoadYanhuaFull();
     }
@@ -1274,6 +1362,7 @@ const App = (() => {
     if (replayBtn) replayBtn.addEventListener("click", onReplay);
     bindCanvasTap();
     bindWeChatAudioFix();
+    bindBgmWaitingResume();
 
     runIntroCountdown();
 
