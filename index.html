@@ -38,10 +38,24 @@
       <!-- 顶部控件，极简的音乐按钮 -->
       <header class="top-controls">
         <button id="muteBtn" class="icon-btn music-btn" type="button" aria-label="静音">
-          <svg class="music-icon" viewBox="0 0 24 24" width="20" height="20">
-            <path d="M9 18V5l12-2v13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="6" cy="18" r="3" fill="currentColor"/>
-            <circle cx="18" cy="16" r="3" fill="currentColor"/>
+          <svg class="music-icon" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+            <defs>
+              <linearGradient id="musicIconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#ff4d8d" />
+                <stop offset="45%" stop-color="#ffd27a" />
+                <stop offset="100%" stop-color="#7a6fff" />
+              </linearGradient>
+            </defs>
+            <path
+              d="M9 18V5l12-2v13"
+              stroke="url(#musicIconGrad)"
+              stroke-width="2"
+              fill="none"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <circle cx="6" cy="18" r="3" fill="url(#musicIconGrad)" />
+            <circle cx="18" cy="16" r="3" fill="url(#musicIconGrad)" />
           </svg>
           <span class="music-wave music-wave-1"></span>
           <span class="music-wave music-wave-2"></span>
@@ -226,7 +240,7 @@
       <!-- 生日倒计时遮罩层 -->
       <div id="startOverlay" class="start-overlay">
         <div class="countdown-intro">
-          <p class="countdown-label">🎂 加加的生日派对即将开始</p>
+          <p class="countdown-label">🎂 欢迎来到加加的生日派对</p>
           <div id="introCountdown" class="intro-countdown-num">5</div>
           <div class="countdown-dots">
             <span class="cd-dot" data-dot="1"></span>
@@ -236,11 +250,10 @@
             <span class="cd-dot" data-dot="5"></span>
           </div>
           <button id="goBtn" class="go-btn" type="button" style="display:none;">
-            <svg viewBox="0 0 48 48" width="56" height="56">
-              <circle cx="24" cy="24" r="23" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
-              <path d="M16 16l8 8-8 8" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M26 16l8 8-8 8" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+            <span class="go-btn-glow" aria-hidden="true"></span>
+            <span class="go-btn-label">
+              <span class="go-btn-label-text">点我开始</span>
+            </span>
           </button>
         </div>
       </div>

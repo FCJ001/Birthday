@@ -200,14 +200,16 @@ const FX = (() => {
     ctx.translate(r.x, r.y);
     ctx.rotate(r.rotation);
     ctx.globalAlpha = Math.min(1, r.age / 40); // 淡入效果
-    
-    // 使用 emoji 绘制玫瑰
+
     const size = Math.floor(r.scale * 30);
     ctx.font = `${size}px serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
+    // 下落玫瑰：压暗 + 高饱和，和背景拉开层次
+    ctx.filter = "saturate(1.55) contrast(1.2) brightness(0.68)";
     ctx.fillText("🌹", 0, 0);
-    
+    ctx.filter = "none";
+
     ctx.restore();
   }
 
@@ -278,7 +280,7 @@ const FX = (() => {
     
     // 3. Draw Roses (source-over)
     ctx.globalCompositeOperation = "source-over";
-    
+
     for (let i = roses.length - 1; i >= 0; i--) {
       const r = roses[i];
       r.age++;
@@ -286,13 +288,13 @@ const FX = (() => {
       r.y += r.vy;
       r.x += Math.sin(time * 0.02 + r.age * 0.01) * 0.5; // 左右摇摆
       r.rotation += r.rotationSpeed;
-      
+
       if (r.age >= r.life || r.y > h + 50) {
         roses[i] = roses[roses.length - 1];
         roses.pop();
         continue;
       }
-      
+
       drawRose(r);
     }
 
