@@ -620,11 +620,28 @@ const App = (() => {
     return path.slice(0, i + 1) + encodeURIComponent(path.slice(i + 1));
   }
 
+  /** 手机/窄屏：更低的长边上限与缩放系数，减轻下载、解码与 canvas 压力 */
+  function isNarrowOrTouchDevice() {
+    const w = window.innerWidth || 0;
+    const h = window.innerHeight || 0;
+    const shortSide = Math.min(w, h);
+    if (shortSide <= 600) return true;
+    if (shortSide <= 900 && ("ontouchstart" in window || (navigator.maxTouchPoints ?? 0) > 0)) return true;
+    return false;
+  }
+
   function getPhotoMaxEdge() {
     const vw = window.innerWidth || 1080;
     const vh = window.innerHeight || 1920;
-    // 以屏幕长边约 1.8 倍作为上限，保证清晰同时减少解码/内存压力
-    return Math.min(2200, Math.round(Math.max(vw, vh) * 1.8));
+    const long = Math.max(vw, vh);
+    if (isNarrowOrTouchDevice()) {
+      return Math.min(1600, Math.round(long * 1.5));
+    }
+    return Math.min(2200, Math.round(long * 1.8));
+  }
+
+  function getPhotoEncodeQuality() {
+    return isNarrowOrTouchDevice() ? 0.82 : 0.92;
   }
 
   function getDisplayPhotoUrl(index) {
@@ -660,8 +677,9 @@ const App = (() => {
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(img, 0, 0, tw, th);
 
+    const q = getPhotoEncodeQuality();
     const blob = await new Promise((resolve) => {
-      canvas.toBlob(resolve, "image/jpeg", 0.92);
+      canvas.toBlob(resolve, "image/jpeg", q);
     });
     if (!blob) return src;
     const objUrl = URL.createObjectURL(blob);
@@ -680,6 +698,7 @@ const App = (() => {
     ...Array.from({ length: 20 }, (_, i) => `./assets/images/${i + 1}.jpg`),
   ];
   const optimizedPhotoUrls = new Map();
+  const preloadPromises = new Map();
   const generatedObjectUrls = [];
   let currentPhotoIndex = 0;
   const photoAlbum = document.getElementById("photoAlbum");
@@ -773,6 +792,23 @@ const App = (() => {
     }
   }
 
+  /** 用户已交互后再在空闲时拉全量 yanhua，避免与首屏图片抢带宽，终幕时减少卡顿 */
+  function warmLoadYanhuaFull() {
+    if (!yanhuaSfx || muted) return;
+    const run = () => {
+      try {
+        yanhuaSfx.load();
+      } catch {
+        /* ignore */
+      }
+    };
+    if (typeof requestIdleCallback === "function") {
+      requestIdleCallback(run, { timeout: 5000 });
+    } else {
+      setTimeout(run, 300);
+    }
+  }
+
   function bindWeChatAudioFix() {
     document.addEventListener(
       "WeixinJSBridgeReady",
@@ -780,6 +816,7 @@ const App = (() => {
         if (!muted) {
           tryPlayBgm();
           primeYanhuaForMobile();
+          warmLoadYanhuaFull();
         }
       },
       false
@@ -876,6 +913,7 @@ const App = (() => {
       
       // 设置第一张图片
       slide1.style.backgroundImage = `url('${getDisplayPhotoUrl(currentPhotoIndex)}')`;
+      void prefetchPhotosAhead(currentPhotoIndex);
 
       let isSlide1Active = true;
       let isHeartbeatTurn = false;
@@ -893,6 +931,7 @@ const App = (() => {
         }
 
         const nextImageUrl = `url('${getDisplayPhotoUrl(currentPhotoIndex)}')`;
+        void prefetchPhotosAhead(currentPhotoIndex);
 
         if (isSlide1Active) {
           slide2.style.backgroundImage = nextImageUrl;
@@ -1107,6 +1146,7 @@ const App = (() => {
 
   async function onReplay() {
     primeYanhuaForMobile();
+    warmLoadYanhuaFull();
     resetAll();
     await new Promise((r) => setTimeout(r, 600));
     runIntroCountdown();
@@ -1179,6 +1219,7 @@ const App = (() => {
   async function onGoClick() {
     await tryPlayBgm();
     primeYanhuaForMobile();
+    warmLoadYanhuaFull();
     startRomance();
   }
 
@@ -1187,6 +1228,7 @@ const App = (() => {
     if (!muted) {
       tryPlayBgm();
       primeYanhuaForMobile();
+      warmLoadYanhuaFull();
     }
   }
 
@@ -1206,14 +1248,6 @@ const App = (() => {
   function init() {
     FX.init();
     setMute(false);
-    if (yanhuaSfx) {
-      try {
-        yanhuaSfx.load();
-      } catch {
-        /* ignore */
-      }
-    }
-
     if (muteBtn) muteBtn.addEventListener("click", onMute);
     if (goBtn) goBtn.addEventListener("click", onGoClick);
     if (replayBtn) replayBtn.addEventListener("click", onReplay);
@@ -1236,25 +1270,61 @@ const App = (() => {
     });
   }
 
-  // 预加载所有图片，防止切换时白屏
+  /** 限制并发，避免微信内置浏览器同时解码/下载过多资源导致卡顿 */
+  async function mapWithConcurrency(items, concurrency, fn) {
+    const n = items.length;
+    if (!n) return;
+    const limit = Math.max(1, Math.min(concurrency, n));
+    let next = 0;
+    async function worker() {
+      while (next < n) {
+        const i = next++;
+        await fn(items[i], i);
+      }
+    }
+    await Promise.all(Array.from({ length: limit }, () => worker()));
+  }
+
+  async function preloadOne(url) {
+    if (optimizedPhotoUrls.has(url)) return;
+    const existing = preloadPromises.get(url);
+    if (existing) return existing;
+    const p = (async () => {
+      try {
+        const optimized = await optimizePhoto(url);
+        optimizedPhotoUrls.set(url, optimized);
+        const img = new Image();
+        img.decoding = "async";
+        img.src = optimized;
+      } catch {
+        const fallback = imageSrc(url);
+        optimizedPhotoUrls.set(url, fallback);
+        const img = new Image();
+        img.decoding = "async";
+        img.src = fallback;
+      } finally {
+        preloadPromises.delete(url);
+      }
+    })();
+    preloadPromises.set(url, p);
+    return p;
+  }
+
+  function prefetchPhotosAhead(index) {
+    for (let a = 1; a <= 3; a++) {
+      const i = index + a;
+      if (i >= photoUrls.length) break;
+      void preloadOne(photoUrls[i]);
+    }
+  }
+
+  // 先完成前几张，再后台加载其余；幻灯片内会再预取后续 3 张，避免尾批未跑完时闪原图
   async function preloadImages() {
-    await Promise.all(
-      photoUrls.map(async (url) => {
-        try {
-          const optimized = await optimizePhoto(url);
-          optimizedPhotoUrls.set(url, optimized);
-          const img = new Image();
-          img.decoding = "async";
-          img.src = optimized;
-        } catch {
-          const fallback = imageSrc(url);
-          optimizedPhotoUrls.set(url, fallback);
-          const img = new Image();
-          img.decoding = "async";
-          img.src = fallback;
-        }
-      })
-    );
+    const PRIORITY = 4;
+    const head = photoUrls.slice(0, PRIORITY);
+    const tail = photoUrls.slice(PRIORITY);
+    await mapWithConcurrency(head, 2, preloadOne);
+    void mapWithConcurrency(tail, 3, preloadOne).catch(() => {});
   }
 
   return { init, preloadImages };

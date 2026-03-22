@@ -12,6 +12,12 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./style.css" />
+    <!-- 首张相册图尽早发起请求，与脚本并行（HTTP 缓存会与后续 decode 去重） -->
+    <link
+      rel="preload"
+      as="image"
+      href="./assets/images/%E5%BE%AE%E4%BF%A1%E5%9B%BE%E7%89%87_20260321225952_183_177.jpg"
+    />
   </head>
   <body>
     <!-- 照片居中相册层 -->
@@ -316,7 +322,7 @@
     </audio>
     <audio
       id="yanhua"
-      preload="auto"
+      preload="metadata"
       playsinline
       webkit-playsinline
       x5-playsinline
