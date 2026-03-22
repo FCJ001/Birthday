@@ -688,9 +688,23 @@ body {
   cursor: pointer;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
   opacity: 0;
   transform: scale(0.88);
   transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
+}
+
+/* 鼠标点击后不保留蓝色焦点框；键盘 Tab 仍可见轮廓 */
+.go-btn:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.go-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 3px;
 }
 
 .go-btn-glow {
@@ -721,6 +735,9 @@ body {
   font-weight: 700;
   letter-spacing: 0.18em;
   text-indent: 0.18em;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
   filter: drop-shadow(0 0 14px rgba(255, 77, 141, 0.55))
     drop-shadow(0 2px 6px rgba(0, 0, 0, 0.28));
 }

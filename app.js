@@ -168,17 +168,18 @@ const FX = (() => {
     return palette.gold;
   }
 
-  /** 吹蜡烛后单簇大礼花：多层同心环 + 中心闪 + 短延迟二次爆，随屏缩放；themeRgb 为当发主色 */
+  /** 吹蜡烛后单簇大礼花：真烟花式随机发散 + 多层叠满；收在屏内；themeRgb 为当发主色 */
   function burstFireworkLarge(cx, cy, themeRgb) {
     const theme =
       themeRgb && themeRgb.length === 3 ? themeRgb : palette.pink;
     const shortSide = Math.min(w, h) || 400;
-    const scale = Math.max(0.92, Math.min(1.55, shortSide / 360));
+    const finaleVel = clamp((shortSide / 580) * 0.5, 0.24, 0.4);
 
+    /** 自然球状爆发：角度微抖 + 径向速度随机，叠多层更「圆满」 */
     function pushRing(n, vMin, vMax, lifeMin, lifeMax, rMin, rMax, gMin, gMax, jitter) {
       for (let i = 0; i < n && sparks.length < FINALE_SPARK_CAP; i++) {
         const a = (i / n) * Math.PI * 2 + rand(-jitter, jitter);
-        const spd = rand(vMin, vMax) * scale;
+        const spd = rand(vMin, vMax) * finaleVel;
         const rgb = pickFinaleSparkRgb(theme);
         sparks.push({
           x: cx,
@@ -188,7 +189,7 @@ const FX = (() => {
           px: cx,
           py: cy,
           r: rand(rMin, rMax),
-          a: rand(0.92, 1.0),
+          a: rand(0.9, 1.0),
           rgb,
           life: Math.round(rand(lifeMin, lifeMax)),
           age: 0,
@@ -199,25 +200,25 @@ const FX = (() => {
 
     if (sparks.length >= FINALE_SPARK_CAP - 120) return;
 
-    // 内核密、中环、外环大 —— 铺满整圈更「圆满」
+    // 内中外三层 + 略增粒子，炸开时更满一圈
     if (isLowEnd) {
-      pushRing(95, 1.8, 6.5, 52, 82, 2.4, 4.8, 0.018, 0.042, 0.08);
-      pushRing(72, 4.5, 11, 58, 88, 2.6, 5.2, 0.02, 0.045, 0.06);
-      pushRing(58, 7.5, 17, 62, 95, 2.8, 5.6, 0.017, 0.04, 0.05);
+      pushRing(102, 1.65, 5.9, 52, 80, 2.2, 4.7, 0.019, 0.042, 0.068);
+      pushRing(80, 3.65, 9.2, 56, 86, 2.4, 5, 0.02, 0.044, 0.058);
+      pushRing(66, 5.85, 12, 60, 94, 2.6, 5.4, 0.018, 0.041, 0.048);
     } else {
-      pushRing(200, 2, 7.5, 55, 88, 2.6, 5.4, 0.016, 0.038, 0.07);
-      pushRing(150, 5, 13.5, 62, 96, 2.8, 5.8, 0.018, 0.042, 0.055);
-      pushRing(120, 9, 22, 68, 108, 3, 6.5, 0.014, 0.036, 0.045);
+      pushRing(220, 1.85, 6.9, 54, 86, 2.4, 5.2, 0.017, 0.039, 0.064);
+      pushRing(170, 3.95, 10.5, 58, 92, 2.6, 5.6, 0.018, 0.042, 0.054);
+      pushRing(136, 6.35, 13.6, 62, 102, 2.8, 6, 0.016, 0.038, 0.045);
     }
 
-    // 中心高亮爆芯
-    const coreN = isLowEnd ? 28 : 48;
+    // 爆芯：全向随机，厚一点中心
+    const coreN = isLowEnd ? 36 : 58;
     for (let i = 0; i < coreN && sparks.length < FINALE_SPARK_CAP; i++) {
       const a = rand(0, Math.PI * 2);
-      const spd = rand(0.4, 4.2) * scale;
+      const spd = rand(0.45, 3.5) * finaleVel;
       const cr = Math.random();
       const rgb =
-        cr < 0.48 ? palette.white : cr < 0.78 ? varyRgb(theme) : palette.gold;
+        cr < 0.46 ? palette.white : cr < 0.76 ? varyRgb(theme) : palette.gold;
       sparks.push({
         x: cx,
         y: cy,
@@ -225,23 +226,23 @@ const FX = (() => {
         vy: Math.sin(a) * spd,
         px: cx,
         py: cy,
-        r: rand(2.4, 5.5),
-        a: rand(0.95, 1.0),
+        r: rand(2.2, 5.2),
+        a: rand(0.94, 1.0),
         rgb,
-        life: rand(28, 48),
+        life: rand(30, 52),
         age: 0,
-        gravity: rand(0.03, 0.055),
+        gravity: rand(0.024, 0.048),
       });
     }
 
-    // 约 0.1s 后二次绽开，体积略收、角度错开，像专业烟花双层
+    // 迟一点再炸一圈，像真烟花二次壳层，角度整体错开
     const phase2 = () => {
       if (!running || sparks.length >= FINALE_SPARK_CAP - 40) return;
-      const rot = rand(0.12, 0.35);
+      const rot = rand(0.14, 0.32);
       if (isLowEnd) {
-        pushRing(48, 5, 14, 48, 78, 2.2, 4.6, 0.02, 0.048, 0.09 + rot);
+        pushRing(54, 4.2, 10.8, 48, 78, 2.1, 4.6, 0.02, 0.046, 0.062 + rot);
       } else {
-        pushRing(100, 6, 18, 52, 86, 2.4, 5.2, 0.017, 0.044, 0.07 + rot);
+        pushRing(112, 5.4, 12.8, 50, 84, 2.3, 5.1, 0.017, 0.043, 0.052 + rot);
       }
     };
     window.setTimeout(phase2, rand(95, 145));
@@ -269,11 +270,12 @@ const FX = (() => {
 
   function spawnSkyrocket(onBurst, themeRgb) {
     if (!w || !h) return;
-    const burstY = h * rand(0.09, 0.14);
+    // 爆炸点固定在水平中线、竖直方向偏上中部，花球落在可视区中央
+    const burstY = h * rand(0.125, 0.168);
     const startY = h + 45;
     const frames = rand(46, 56);
     const vy = -(startY - burstY) / frames;
-    const cx = w * 0.5 + rand(-Math.min(28, w * 0.04), Math.min(28, w * 0.04));
+    const cx = w * 0.5;
     const trailRgb =
       themeRgb && themeRgb.length === 3 ? themeRgb : palette.pink;
     rockets.push({
@@ -675,7 +677,7 @@ const App = (() => {
   ];
   const photoUrls = [
     ...PHOTOS_FIRST,
-    ...Array.from({ length: 20 }, (_, i) => `./assets/images/${i + 1}.jpg`),
+    // ...Array.from({ length: 20 }, (_, i) => `./assets/images/${i + 1}.jpg`),
   ];
   const optimizedPhotoUrls = new Map();
   const generatedObjectUrls = [];
