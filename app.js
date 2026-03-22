@@ -17,7 +17,7 @@ const FX = (() => {
     (window.screen && Math.min(window.screen.width, window.screen.height) < 500);
   const MAX_SPARKS = isLowEnd ? 400 : 800;
   /** 吹蜡烛终幕大礼花可占用的粒子上限（高于普通烟花） */
-  const FINALE_SPARK_CAP = isLowEnd ? 720 : 1550;
+  const FINALE_SPARK_CAP = isLowEnd ? 820 : 1750;
   const MAX_HEARTS = isLowEnd ? 150 : 300;
 
   const palette = {
@@ -168,12 +168,12 @@ const FX = (() => {
     return palette.gold;
   }
 
-  /** 吹蜡烛后单簇大礼花：真烟花式随机发散 + 多层叠满；收在屏内；themeRgb 为当发主色 */
+  /** 吹蜡烛后单簇大礼花：真烟花式随机发散 + 多层叠满；更绚烂，可轻微溢出屏外 */
   function burstFireworkLarge(cx, cy, themeRgb) {
     const theme =
       themeRgb && themeRgb.length === 3 ? themeRgb : palette.pink;
     const shortSide = Math.min(w, h) || 400;
-    const finaleVel = clamp((shortSide / 580) * 0.5, 0.24, 0.4);
+    const finaleVel = clamp((shortSide / 580) * 0.72, 0.36, 0.58);
 
     /** 自然球状爆发：角度微抖 + 径向速度随机，叠多层更「圆满」 */
     function pushRing(n, vMin, vMax, lifeMin, lifeMax, rMin, rMax, gMin, gMax, jitter) {
@@ -200,22 +200,22 @@ const FX = (() => {
 
     if (sparks.length >= FINALE_SPARK_CAP - 120) return;
 
-    // 内中外三层 + 略增粒子，炸开时更满一圈
+    // 内中外三层：粒子更密、外圈更快，拖尾略长
     if (isLowEnd) {
-      pushRing(102, 1.65, 5.9, 52, 80, 2.2, 4.7, 0.019, 0.042, 0.068);
-      pushRing(80, 3.65, 9.2, 56, 86, 2.4, 5, 0.02, 0.044, 0.058);
-      pushRing(66, 5.85, 12, 60, 94, 2.6, 5.4, 0.018, 0.041, 0.048);
+      pushRing(112, 1.75, 6.6, 54, 84, 2.3, 4.9, 0.018, 0.041, 0.07);
+      pushRing(88, 3.9, 10.2, 58, 90, 2.5, 5.2, 0.019, 0.043, 0.059);
+      pushRing(74, 6.2, 14.2, 62, 98, 2.7, 5.6, 0.017, 0.039, 0.049);
     } else {
-      pushRing(220, 1.85, 6.9, 54, 86, 2.4, 5.2, 0.017, 0.039, 0.064);
-      pushRing(170, 3.95, 10.5, 58, 92, 2.6, 5.6, 0.018, 0.042, 0.054);
-      pushRing(136, 6.35, 13.6, 62, 102, 2.8, 6, 0.016, 0.038, 0.045);
+      pushRing(248, 1.95, 7.6, 56, 90, 2.5, 5.5, 0.016, 0.038, 0.065);
+      pushRing(188, 4.2, 11.8, 60, 96, 2.7, 5.9, 0.017, 0.041, 0.055);
+      pushRing(152, 6.8, 16.2, 64, 108, 2.9, 6.4, 0.015, 0.036, 0.046);
     }
 
-    // 爆芯：全向随机，厚一点中心
-    const coreN = isLowEnd ? 36 : 58;
+    // 爆芯：更亮更厚
+    const coreN = isLowEnd ? 42 : 68;
     for (let i = 0; i < coreN && sparks.length < FINALE_SPARK_CAP; i++) {
       const a = rand(0, Math.PI * 2);
-      const spd = rand(0.45, 3.5) * finaleVel;
+      const spd = rand(0.5, 4.6) * finaleVel;
       const cr = Math.random();
       const rgb =
         cr < 0.46 ? palette.white : cr < 0.76 ? varyRgb(theme) : palette.gold;
@@ -226,23 +226,23 @@ const FX = (() => {
         vy: Math.sin(a) * spd,
         px: cx,
         py: cy,
-        r: rand(2.2, 5.2),
+        r: rand(2.4, 5.6),
         a: rand(0.94, 1.0),
         rgb,
-        life: rand(30, 52),
+        life: rand(32, 56),
         age: 0,
-        gravity: rand(0.024, 0.048),
+        gravity: rand(0.022, 0.046),
       });
     }
 
-    // 迟一点再炸一圈，像真烟花二次壳层，角度整体错开
+    // 二次壳层：更大一圈，与主爆错开
     const phase2 = () => {
       if (!running || sparks.length >= FINALE_SPARK_CAP - 40) return;
       const rot = rand(0.14, 0.32);
       if (isLowEnd) {
-        pushRing(54, 4.2, 10.8, 48, 78, 2.1, 4.6, 0.02, 0.046, 0.062 + rot);
+        pushRing(62, 4.6, 12.4, 50, 82, 2.2, 4.8, 0.019, 0.044, 0.064 + rot);
       } else {
-        pushRing(112, 5.4, 12.8, 50, 84, 2.3, 5.1, 0.017, 0.043, 0.052 + rot);
+        pushRing(128, 5.8, 14.6, 52, 90, 2.4, 5.4, 0.016, 0.041, 0.054 + rot);
       }
     };
     window.setTimeout(phase2, rand(95, 145));
@@ -707,8 +707,9 @@ const App = (() => {
     cakeFinaleMixApplied = true;
     if (bgm) {
       savedBgmVolume = bgm.volume;
-      const ducked = savedBgmVolume * 0.22;
-      bgm.volume = Math.max(0.05, Math.min(0.32, ducked));
+      // 终幕再压低 BGM，手机上烟花音效更容易盖过背景音乐
+      const ducked = savedBgmVolume * 0.11;
+      bgm.volume = Math.max(0.04, Math.min(0.22, ducked));
     }
     if (yanhuaSfx) {
       savedYanhuaVolume = yanhuaSfx.volume;
@@ -723,9 +724,39 @@ const App = (() => {
     if (yanhuaSfx) yanhuaSfx.volume = savedYanhuaVolume;
   }
 
+  /**
+   * 必须在用户点击等手势回调里调用一次：解锁 iOS/微信 等对「未播放过」音频的限制，
+   * 否则终幕里 queueMicrotask 触发的 play() 会被静默拒绝。
+   */
+  function primeYanhuaForMobile() {
+    if (!yanhuaSfx || muted) return;
+    try {
+      yanhuaSfx.setAttribute("playsinline", "");
+      yanhuaSfx.setAttribute("webkit-playsinline", "");
+    } catch {
+      /* ignore */
+    }
+    const prevVol = yanhuaSfx.volume > 0 ? yanhuaSfx.volume : 1;
+    yanhuaSfx.muted = false;
+    yanhuaSfx.volume = 0.0001;
+    const finish = () => {
+      yanhuaSfx.pause();
+      yanhuaSfx.currentTime = 0;
+      yanhuaSfx.volume = prevVol;
+    };
+    const p = yanhuaSfx.play();
+    if (p !== undefined) {
+      p.then(finish).catch(() => {
+        yanhuaSfx.volume = prevVol;
+      });
+    } else {
+      finish();
+    }
+  }
+
   function playYanhuaOnce() {
     if (!yanhuaSfx || muted) return;
-    yanhuaSfx.muted = muted;
+    yanhuaSfx.muted = false;
     if (cakeFinaleMixApplied) yanhuaSfx.volume = 1;
     yanhuaSfx.currentTime = 0;
     yanhuaSfx.play().catch(() => {});
@@ -746,7 +777,10 @@ const App = (() => {
     document.addEventListener(
       "WeixinJSBridgeReady",
       () => {
-        if (!muted) tryPlayBgm();
+        if (!muted) {
+          tryPlayBgm();
+          primeYanhuaForMobile();
+        }
       },
       false
     );
@@ -1072,6 +1106,7 @@ const App = (() => {
   }
 
   async function onReplay() {
+    primeYanhuaForMobile();
     resetAll();
     await new Promise((r) => setTimeout(r, 600));
     runIntroCountdown();
@@ -1143,6 +1178,7 @@ const App = (() => {
 
   async function onGoClick() {
     await tryPlayBgm();
+    primeYanhuaForMobile();
     startRomance();
   }
 
@@ -1150,6 +1186,7 @@ const App = (() => {
     setMute(!muted);
     if (!muted) {
       tryPlayBgm();
+      primeYanhuaForMobile();
     }
   }
 
@@ -1169,6 +1206,13 @@ const App = (() => {
   function init() {
     FX.init();
     setMute(false);
+    if (yanhuaSfx) {
+      try {
+        yanhuaSfx.load();
+      } catch {
+        /* ignore */
+      }
+    }
 
     if (muteBtn) muteBtn.addEventListener("click", onMute);
     if (goBtn) goBtn.addEventListener("click", onGoClick);
