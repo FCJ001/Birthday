@@ -4,3 +4,9 @@ music.mp3
 
 然后刷新页面即可。
 
+建议体积控制在 3MB 以内（手机微信里更稳）。若文件很大，可用本机 ffmpeg 压一版再替换：
+
+  ffmpeg -i music.mp3 -codec:a libmp3lame -b:a 96k -ac 1 music-small.mp3
+
+满意后把 music-small.mp3 改名为 music.mp3 即可。
+

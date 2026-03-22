@@ -787,8 +787,27 @@ const App = (() => {
       await bgm.play();
       if (!muted) muteBtn.classList.add("playing");
       return true;
-    } catch {
-      return false;
+    } catch (e) {
+      // 未在用户手势内（如仅 WeixinJSBridgeReady）时浏览器会拒绝播放
+      if (e && e.name === "NotAllowedError") return false;
+      // 元数据预载后数据不足等：load 再等 canplay 后重试一次
+      await new Promise((resolve) => {
+        const done = () => resolve();
+        bgm.addEventListener("canplay", done, { once: true });
+        bgm.addEventListener("error", done, { once: true });
+        try {
+          bgm.load();
+        } catch {
+          done();
+        }
+      });
+      try {
+        await bgm.play();
+        if (!muted) muteBtn.classList.add("playing");
+        return true;
+      } catch {
+        return false;
+      }
     }
   }
 

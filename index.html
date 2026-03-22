@@ -7,10 +7,19 @@
     <title>加加生日快乐</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- 不阻塞首屏；国内访问 Google 慢时仍可用 system-ui 回退 -->
     <link
       href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;600;800&display=swap"
       rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
     />
+    <noscript>
+      <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;600;800&display=swap"
+        rel="stylesheet"
+      />
+    </noscript>
     <link rel="stylesheet" href="./style.css" />
     <!-- 首张相册图尽早发起请求，与脚本并行（HTTP 缓存会与后续 decode 去重） -->
     <link
@@ -317,7 +326,8 @@
       </button>
     </section>
 
-    <audio id="bgm" preload="auto" loop playsinline webkit-playsinline>
+    <!-- music.mp3 若很大，auto 预载会与相册抢带宽；点击开始后再流式播放 -->
+    <audio id="bgm" preload="metadata" loop playsinline webkit-playsinline>
       <source src="./assets/music.mp3" type="audio/mpeg" />
     </audio>
     <audio
