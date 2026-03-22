@@ -707,6 +707,21 @@ body {
   outline-offset: 3px;
 }
 
+.go-btn--assets-loading {
+  cursor: wait;
+}
+
+.go-btn:disabled {
+  cursor: wait;
+  opacity: 0.9;
+}
+
+.go-btn.show:disabled,
+.go-btn.show:disabled:active {
+  transform: scale(1) !important;
+  opacity: 0.9;
+}
+
 .go-btn-glow {
   position: absolute;
   inset: -6px;
@@ -745,6 +760,12 @@ body {
 .go-btn-label-text {
   display: inline-block;
   color: var(--gold);
+}
+
+.go-btn-label-text.go-btn-label--loading {
+  letter-spacing: 0.06em;
+  font-size: 15px;
+  text-indent: 0.06em;
 }
 
 @supports (-webkit-background-clip: text) or (background-clip: text) {
@@ -839,6 +860,11 @@ body {
     font-size: 15px;
     letter-spacing: 0.14em;
     text-indent: 0.14em;
+  }
+  .go-btn-label-text.go-btn-label--loading {
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-indent: 0.04em;
   }
 }
 

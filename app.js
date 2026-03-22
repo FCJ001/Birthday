@@ -589,6 +589,7 @@ const App = (() => {
   const introCountdown = document.getElementById("introCountdown");
   const cdDots = Array.from(document.querySelectorAll(".cd-dot"));
   const goBtn = document.getElementById("goBtn");
+  const goBtnLabelText = document.getElementById("goBtnLabelText");
   const muteBtn = document.getElementById("muteBtn");
   const bgm = document.getElementById("bgm");
   const yanhuaSfx = document.getElementById("yanhua");
@@ -612,6 +613,10 @@ const App = (() => {
   let photoTimer = null;
   let photosShown = 0;
   let animAppearanceCount = 0;
+  /** 后台预加载任务；点击「点我开始」时再 await */
+  let assetsPreloadPromise = null;
+  /** 已完成预加载的照片数（用于按钮文案与可点状态） */
+  let assetsLoadedCount = 0;
 
   /** 中文文件名需编码，避免部分环境加载失败 */
   function imageSrc(path) {
@@ -1119,7 +1124,13 @@ const App = (() => {
     cdDots.forEach((d) => d.classList.remove("lit"));
     if (goBtn) {
       goBtn.style.display = "none";
-      goBtn.classList.remove("show");
+      goBtn.classList.remove("show", "go-btn--assets-loading");
+      goBtn.disabled = false;
+      goBtn.removeAttribute("aria-busy");
+    }
+    if (goBtnLabelText) {
+      goBtnLabelText.textContent = "资源加载中请等待";
+      goBtnLabelText.classList.add("go-btn-label--loading");
     }
 
     // 音乐回到开头
@@ -1193,8 +1204,36 @@ const App = (() => {
     }, 1000);
   }
 
+  function syncGoBtnAssetState() {
+    if (!goBtn || !goBtnLabelText) return;
+    const total = photoUrls.length;
+    if (total === 0) {
+      goBtnLabelText.textContent = "点我开始";
+      goBtnLabelText.classList.remove("go-btn-label--loading");
+      goBtn.disabled = false;
+      goBtn.classList.remove("go-btn--assets-loading");
+      goBtn.removeAttribute("aria-busy");
+      return;
+    }
+    const ratio = assetsLoadedCount / total;
+    if (ratio < 0.5) {
+      goBtnLabelText.textContent = "资源加载中请等待";
+      goBtnLabelText.classList.add("go-btn-label--loading");
+      goBtn.disabled = true;
+      goBtn.classList.add("go-btn--assets-loading");
+      goBtn.setAttribute("aria-busy", "true");
+    } else {
+      goBtnLabelText.textContent = "点我开始";
+      goBtnLabelText.classList.remove("go-btn-label--loading");
+      goBtn.disabled = false;
+      goBtn.classList.remove("go-btn--assets-loading");
+      goBtn.removeAttribute("aria-busy");
+    }
+  }
+
   function showGoBtn() {
     if (!goBtn) return;
+    syncGoBtnAssetState();
     goBtn.style.display = "flex";
     requestAnimationFrame(() => {
       requestAnimationFrame(() => goBtn.classList.add("show"));
@@ -1202,6 +1241,10 @@ const App = (() => {
   }
 
   async function onGoClick() {
+    if (!assetsPreloadPromise) {
+      assetsPreloadPromise = preloadImages().catch(() => {});
+    }
+    await assetsPreloadPromise;
     await tryPlayBgm();
     primeYanhuaForMobile();
     startRomance();
@@ -1282,30 +1325,51 @@ const App = (() => {
 
   async function preloadOnePhoto(url) {
     try {
-      const optimized = await optimizePhoto(url);
-      optimizedPhotoUrls.set(url, optimized);
-      await cacheImageUrl(optimized);
-    } catch {
-      const fallback = imageSrc(url);
-      optimizedPhotoUrls.set(url, fallback);
-      await cacheImageUrl(fallback);
+      try {
+        const optimized = await optimizePhoto(url);
+        optimizedPhotoUrls.set(url, optimized);
+        await cacheImageUrl(optimized);
+      } catch {
+        const fallback = imageSrc(url);
+        optimizedPhotoUrls.set(url, fallback);
+        await cacheImageUrl(fallback);
+      }
+    } finally {
+      assetsLoadedCount += 1;
+      syncGoBtnAssetState();
     }
   }
 
   // 先压首屏几张，再并行其余，失败单张不拖死整站
   async function preloadImages() {
-    if (photoUrls.length === 0) return;
-    const priority = Math.min(4, photoUrls.length);
-    for (let i = 0; i < priority; i++) {
-      await preloadOnePhoto(photoUrls[i]);
+    assetsLoadedCount = 0;
+    syncGoBtnAssetState();
+    if (photoUrls.length === 0) {
+      syncGoBtnAssetState();
+      return;
     }
-    await Promise.allSettled(photoUrls.slice(priority).map((u) => preloadOnePhoto(u)));
+    try {
+      const priority = Math.min(4, photoUrls.length);
+      for (let i = 0; i < priority; i++) {
+        await preloadOnePhoto(photoUrls[i]);
+      }
+      await Promise.allSettled(photoUrls.slice(priority).map((u) => preloadOnePhoto(u)));
+    } catch {
+      /* 单张异常已在 preloadOnePhoto 内兜底，此处防止未捕获中断 Promise */
+    }
+    syncGoBtnAssetState();
   }
 
-  return { init, preloadImages };
+  /** 与 init 并行启动，不阻塞开场倒计时 */
+  function startBackgroundPreload() {
+    if (assetsPreloadPromise) return;
+    assetsPreloadPromise = preloadImages().catch(() => {});
+  }
+
+  return { init, preloadImages, startBackgroundPreload };
 })();
 
-window.addEventListener("DOMContentLoaded", async () => {
-  await App.preloadImages();
+window.addEventListener("DOMContentLoaded", () => {
+  App.startBackgroundPreload();
   App.init();
 });
