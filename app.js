@@ -675,7 +675,7 @@ const App = (() => {
   ];
   const photoUrls = [
     ...PHOTOS_FIRST,
-    // ...Array.from({ length: 20 }, (_, i) => `./assets/images/${i + 1}.jpg`),
+    ...Array.from({ length: 20 }, (_, i) => `./assets/images/${i + 1}.jpg`),
   ];
   const optimizedPhotoUrls = new Map();
   const generatedObjectUrls = [];
