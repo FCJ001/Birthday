@@ -228,6 +228,17 @@ body {
   justify-content: center;
   cursor: pointer;
   transition: color 0.4s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 去掉鼠标/触摸后的默认蓝框；键盘 Tab 时保留主题色轮廓 */
+.icon-btn:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.icon-btn:focus-visible {
+  outline: 2px solid rgba(255, 77, 141, 0.75);
+  outline-offset: 3px;
 }
 
 .icon-btn[aria-pressed="true"] {

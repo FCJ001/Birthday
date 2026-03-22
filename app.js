@@ -697,6 +697,8 @@ const App = (() => {
     ...PHOTOS_FIRST,
     ...Array.from({ length: 20 }, (_, i) => `./assets/images/${i + 1}.jpg`),
   ];
+  /** 每张相册图停留时长（毫秒），切换间隔 = 此值 */
+  const PHOTO_SLIDE_INTERVAL_MS = 8000;
   const optimizedPhotoUrls = new Map();
   const preloadPromises = new Map();
   const generatedObjectUrls = [];
@@ -979,7 +981,7 @@ const App = (() => {
           }
         }
 
-      }, 5000);
+      }, PHOTO_SLIDE_INTERVAL_MS);
     }, 2000);
   }
 
