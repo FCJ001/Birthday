@@ -589,7 +589,6 @@ const App = (() => {
   const introCountdown = document.getElementById("introCountdown");
   const cdDots = Array.from(document.querySelectorAll(".cd-dot"));
   const goBtn = document.getElementById("goBtn");
-  const goBtnLabelText = document.getElementById("goBtnLabelText");
   const muteBtn = document.getElementById("muteBtn");
   const bgm = document.getElementById("bgm");
   const yanhuaSfx = document.getElementById("yanhua");
@@ -613,10 +612,6 @@ const App = (() => {
   let photoTimer = null;
   let photosShown = 0;
   let animAppearanceCount = 0;
-  /** 后台预加载任务；点击「点我开始」时再 await */
-  let assetsPreloadPromise = null;
-  /** 已完成预加载的照片数（用于按钮文案与可点状态） */
-  let assetsLoadedCount = 0;
 
   /** 中文文件名需编码，避免部分环境加载失败 */
   function imageSrc(path) {
@@ -641,16 +636,8 @@ const App = (() => {
     const src = imageSrc(url);
     const img = new Image();
     img.decoding = "async";
-    await new Promise((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error("image load failed"));
-      img.src = src;
-    });
-    try {
-      if (img.decode) await img.decode();
-    } catch {
-      /* 部分环境 decode 非必须 */
-    }
+    img.src = src;
+    await img.decode();
 
     const w = img.naturalWidth || 0;
     const h = img.naturalHeight || 0;
@@ -775,32 +762,15 @@ const App = (() => {
     yanhuaSfx.play().catch(() => {});
   }
 
-  function warmBgmElement() {
-    if (!bgm) return;
-    try {
-      bgm.preload = "auto";
-      bgm.load();
-    } catch {
-      /* ignore */
-    }
-  }
-
   async function tryPlayBgm() {
     if (!bgm) return false;
-    for (let attempt = 0; attempt < 4; attempt++) {
-      try {
-        if (attempt > 0) {
-          warmBgmElement();
-          await new Promise((r) => setTimeout(r, 160 * attempt));
-        }
-        await bgm.play();
-        if (!muted) muteBtn.classList.add("playing");
-        return true;
-      } catch {
-        /* 首包未就绪或策略拦截，重试 */
-      }
+    try {
+      await bgm.play();
+      if (!muted) muteBtn.classList.add("playing");
+      return true;
+    } catch {
+      return false;
     }
-    return false;
   }
 
   function bindWeChatAudioFix() {
@@ -808,7 +778,7 @@ const App = (() => {
       "WeixinJSBridgeReady",
       () => {
         if (!muted) {
-          warmBgmElement();
+          tryPlayBgm();
           primeYanhuaForMobile();
         }
       },
@@ -1124,13 +1094,7 @@ const App = (() => {
     cdDots.forEach((d) => d.classList.remove("lit"));
     if (goBtn) {
       goBtn.style.display = "none";
-      goBtn.classList.remove("show", "go-btn--assets-loading");
-      goBtn.disabled = false;
-      goBtn.removeAttribute("aria-busy");
-    }
-    if (goBtnLabelText) {
-      goBtnLabelText.textContent = "资源加载中请等待";
-      goBtnLabelText.classList.add("go-btn-label--loading");
+      goBtn.classList.remove("show");
     }
 
     // 音乐回到开头
@@ -1204,35 +1168,8 @@ const App = (() => {
     }, 1000);
   }
 
-  function syncGoBtnAssetState() {
-    if (!goBtn || !goBtnLabelText) return;
-    const total = photoUrls.length;
-    if (total === 0) {
-      goBtnLabelText.textContent = "点我开始";
-      goBtnLabelText.classList.remove("go-btn-label--loading");
-      goBtn.disabled = false;
-      goBtn.classList.remove("go-btn--assets-loading");
-      goBtn.removeAttribute("aria-busy");
-      return;
-    }
-    if (assetsLoadedCount < total) {
-      goBtnLabelText.textContent = "资源加载中请等待";
-      goBtnLabelText.classList.add("go-btn-label--loading");
-      goBtn.disabled = true;
-      goBtn.classList.add("go-btn--assets-loading");
-      goBtn.setAttribute("aria-busy", "true");
-    } else {
-      goBtnLabelText.textContent = "点我开始";
-      goBtnLabelText.classList.remove("go-btn-label--loading");
-      goBtn.disabled = false;
-      goBtn.classList.remove("go-btn--assets-loading");
-      goBtn.removeAttribute("aria-busy");
-    }
-  }
-
   function showGoBtn() {
     if (!goBtn) return;
-    syncGoBtnAssetState();
     goBtn.style.display = "flex";
     requestAnimationFrame(() => {
       requestAnimationFrame(() => goBtn.classList.add("show"));
@@ -1240,10 +1177,6 @@ const App = (() => {
   }
 
   async function onGoClick() {
-    if (!assetsPreloadPromise) {
-      assetsPreloadPromise = preloadImages().catch(() => {});
-    }
-    await assetsPreloadPromise;
     await tryPlayBgm();
     primeYanhuaForMobile();
     startRomance();
@@ -1252,10 +1185,8 @@ const App = (() => {
   function onMute() {
     setMute(!muted);
     if (!muted) {
+      tryPlayBgm();
       primeYanhuaForMobile();
-      if (started) {
-        tryPlayBgm();
-      }
     }
   }
 
@@ -1275,10 +1206,8 @@ const App = (() => {
   function init() {
     FX.init();
     setMute(false);
-    warmBgmElement();
     if (yanhuaSfx) {
       try {
-        yanhuaSfx.preload = "auto";
         yanhuaSfx.load();
       } catch {
         /* ignore */
@@ -1307,70 +1236,31 @@ const App = (() => {
     });
   }
 
-  /** 将最终展示 URL 解码进浏览器缓存，避免相册首帧空白 */
-  function cacheImageUrl(displayUrl) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.decoding = "async";
-      img.onload = () => {
-        if (img.decode) {
-          img.decode().then(resolve).catch(resolve);
-        } else {
-          resolve();
-        }
-      };
-      img.onerror = () => resolve();
-      img.src = displayUrl;
-    });
-  }
-
-  async function preloadOnePhoto(url) {
-    try {
-      try {
-        const optimized = await optimizePhoto(url);
-        optimizedPhotoUrls.set(url, optimized);
-        await cacheImageUrl(optimized);
-      } catch {
-        const fallback = imageSrc(url);
-        optimizedPhotoUrls.set(url, fallback);
-        await cacheImageUrl(fallback);
-      }
-    } finally {
-      assetsLoadedCount += 1;
-      syncGoBtnAssetState();
-    }
-  }
-
-  // 先压首屏几张，再并行其余，失败单张不拖死整站
+  // 预加载所有图片，防止切换时白屏
   async function preloadImages() {
-    assetsLoadedCount = 0;
-    syncGoBtnAssetState();
-    if (photoUrls.length === 0) {
-      syncGoBtnAssetState();
-      return;
-    }
-    try {
-      const priority = Math.min(4, photoUrls.length);
-      for (let i = 0; i < priority; i++) {
-        await preloadOnePhoto(photoUrls[i]);
-      }
-      await Promise.allSettled(photoUrls.slice(priority).map((u) => preloadOnePhoto(u)));
-    } catch {
-      /* 单张异常已在 preloadOnePhoto 内兜底，此处防止未捕获中断 Promise */
-    }
-    syncGoBtnAssetState();
+    await Promise.all(
+      photoUrls.map(async (url) => {
+        try {
+          const optimized = await optimizePhoto(url);
+          optimizedPhotoUrls.set(url, optimized);
+          const img = new Image();
+          img.decoding = "async";
+          img.src = optimized;
+        } catch {
+          const fallback = imageSrc(url);
+          optimizedPhotoUrls.set(url, fallback);
+          const img = new Image();
+          img.decoding = "async";
+          img.src = fallback;
+        }
+      })
+    );
   }
 
-  /** 与 init 并行启动，不阻塞开场倒计时 */
-  function startBackgroundPreload() {
-    if (assetsPreloadPromise) return;
-    assetsPreloadPromise = preloadImages().catch(() => {});
-  }
-
-  return { init, preloadImages, startBackgroundPreload };
+  return { init, preloadImages };
 })();
 
 window.addEventListener("DOMContentLoaded", () => {
-  App.startBackgroundPreload();
+  App.preloadImages();
   App.init();
 });
