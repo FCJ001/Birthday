@@ -13,6 +13,11 @@ const FX = (() => {
   const rand = (a, b) => a + Math.random() * (b - a);
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 
+  const isLowEnd = /Mobi|Android/i.test(navigator.userAgent) ||
+    (window.screen && Math.min(window.screen.width, window.screen.height) < 500);
+  const MAX_SPARKS = isLowEnd ? 400 : 800;
+  const MAX_HEARTS = isLowEnd ? 150 : 300;
+
   const palette = {
     pink: [255, 77, 141],
     rose: [255, 122, 168],
@@ -70,7 +75,10 @@ const FX = (() => {
   }
 
   function burstHeart(cx, cy, scale = 10) {
-    const n = Math.random() < 0.5 ? 80 : 40; // 爱心也分大小
+    if (hearts.length >= MAX_HEARTS) return;
+    const n = isLowEnd
+      ? (Math.random() < 0.5 ? 40 : 24)
+      : (Math.random() < 0.5 ? 80 : 40);
     const rgb = paletteList[(Math.random() * 3) | 0]; // lean pink/rose/violet
     for (let i = 0; i < n; i++) {
       const t = (i / n) * Math.PI * 2;
@@ -94,7 +102,10 @@ const FX = (() => {
   }
 
   function burstFirework(cx, cy) {
-    const m = Math.random() < 0.5 ? 150 : 60; // 50%概率产生大爆炸
+    if (sparks.length >= MAX_SPARKS) return;
+    const m = isLowEnd
+      ? (Math.random() < 0.5 ? 70 : 35)
+      : (Math.random() < 0.5 ? 150 : 60);
     const rgb = paletteList[(Math.random() * paletteList.length) | 0];
     for (let i = 0; i < m; i++) {
       const a = (i / m) * Math.PI * 2 + rand(-0.12, 0.12);
@@ -128,7 +139,6 @@ const FX = (() => {
   }
 
   function drawSpark(p) {
-    // 拖尾：先画上一帧到当前帧的线段
     ctx.strokeStyle = rgba(p.rgb, p.a * 0.45);
     ctx.lineWidth = Math.max(1, p.r * 0.55);
     ctx.beginPath();
@@ -136,16 +146,16 @@ const FX = (() => {
     ctx.lineTo(p.x, p.y);
     ctx.stroke();
 
-    // 外层光晕
-    ctx.beginPath();
-    ctx.fillStyle = rgba(p.rgb, p.a * 0.34);
-    ctx.arc(p.x, p.y, p.r * 2.2, 0, Math.PI * 2);
-    ctx.fill();
+    if (!isLowEnd) {
+      ctx.beginPath();
+      ctx.fillStyle = rgba(p.rgb, p.a * 0.34);
+      ctx.arc(p.x, p.y, p.r * 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
-    // 内核高亮
     ctx.beginPath();
     ctx.fillStyle = rgba(p.rgb, Math.min(1, p.a));
-    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, isLowEnd ? p.r * 1.4 : p.r, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -240,7 +250,8 @@ const FX = (() => {
       p.r *= 0.997;
       
       if (p.age >= p.life) {
-        sparks.splice(i, 1);
+        sparks[i] = sparks[sparks.length - 1];
+        sparks.pop();
         continue;
       }
       
@@ -257,7 +268,8 @@ const FX = (() => {
       hp.vy *= 0.985;
       
       if (hp.age >= hp.life) {
-        hearts.splice(i, 1);
+        hearts[i] = hearts[hearts.length - 1];
+        hearts.pop();
         continue;
       }
       
@@ -276,7 +288,8 @@ const FX = (() => {
       r.rotation += r.rotationSpeed;
       
       if (r.age >= r.life || r.y > h + 50) {
-        roses.splice(i, 1);
+        roses[i] = roses[roses.length - 1];
+        roses.pop();
         continue;
       }
       
@@ -286,9 +299,9 @@ const FX = (() => {
     // subtle vignette
     ctx.save();
     ctx.globalCompositeOperation = "source-over";
-    const g = ctx.createRadialGradient(w * 0.5, h * 0.35, Math.min(w, h) * 0.2, w * 0.5, h * 0.45, Math.min(w, h) * 0.7);
+    const g = ctx.createRadialGradient(w * 0.5, h * 0.35, Math.min(w, h) * 0.25, w * 0.5, h * 0.45, Math.min(w, h) * 0.75);
     g.addColorStop(0, "rgba(0,0,0,0)");
-    g.addColorStop(1, "rgba(0,0,0,0.40)");
+    g.addColorStop(1, "rgba(0,0,0,0.25)");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
     ctx.restore();
