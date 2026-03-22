@@ -12,6 +12,10 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./style.css" />
+    <!-- 优先拉取首屏媒体，减轻首次解码/播放失败 -->
+    <link rel="preload" href="./assets/music.mp3" as="audio" />
+    <link rel="preload" href="./assets/yanhua.mp3" as="audio" />
+    <link rel="preload" href="./assets/images/1.jpg" as="image" />
   </head>
   <body>
     <!-- 照片居中相册层 -->

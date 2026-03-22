@@ -636,8 +636,16 @@ const App = (() => {
     const src = imageSrc(url);
     const img = new Image();
     img.decoding = "async";
-    img.src = src;
-    await img.decode();
+    await new Promise((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("image load failed"));
+      img.src = src;
+    });
+    try {
+      if (img.decode) await img.decode();
+    } catch {
+      /* 部分环境 decode 非必须 */
+    }
 
     const w = img.naturalWidth || 0;
     const h = img.naturalHeight || 0;
@@ -677,7 +685,7 @@ const App = (() => {
   ];
   const photoUrls = [
     ...PHOTOS_FIRST,
-    // ...Array.from({ length: 20 }, (_, i) => `./assets/images/${i + 1}.jpg`),
+    ...Array.from({ length: 20 }, (_, i) => `./assets/images/${i + 1}.jpg`),
   ];
   const optimizedPhotoUrls = new Map();
   const generatedObjectUrls = [];
@@ -762,15 +770,32 @@ const App = (() => {
     yanhuaSfx.play().catch(() => {});
   }
 
+  function warmBgmElement() {
+    if (!bgm) return;
+    try {
+      bgm.preload = "auto";
+      bgm.load();
+    } catch {
+      /* ignore */
+    }
+  }
+
   async function tryPlayBgm() {
     if (!bgm) return false;
-    try {
-      await bgm.play();
-      if (!muted) muteBtn.classList.add("playing");
-      return true;
-    } catch {
-      return false;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        if (attempt > 0) {
+          warmBgmElement();
+          await new Promise((r) => setTimeout(r, 160 * attempt));
+        }
+        await bgm.play();
+        if (!muted) muteBtn.classList.add("playing");
+        return true;
+      } catch {
+        /* 首包未就绪或策略拦截，重试 */
+      }
     }
+    return false;
   }
 
   function bindWeChatAudioFix() {
@@ -1206,8 +1231,10 @@ const App = (() => {
   function init() {
     FX.init();
     setMute(false);
+    warmBgmElement();
     if (yanhuaSfx) {
       try {
+        yanhuaSfx.preload = "auto";
         yanhuaSfx.load();
       } catch {
         /* ignore */
@@ -1236,31 +1263,49 @@ const App = (() => {
     });
   }
 
-  // 预加载所有图片，防止切换时白屏
-  async function preloadImages() {
-    await Promise.all(
-      photoUrls.map(async (url) => {
-        try {
-          const optimized = await optimizePhoto(url);
-          optimizedPhotoUrls.set(url, optimized);
-          const img = new Image();
-          img.decoding = "async";
-          img.src = optimized;
-        } catch {
-          const fallback = imageSrc(url);
-          optimizedPhotoUrls.set(url, fallback);
-          const img = new Image();
-          img.decoding = "async";
-          img.src = fallback;
+  /** 将最终展示 URL 解码进浏览器缓存，避免相册首帧空白 */
+  function cacheImageUrl(displayUrl) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.decoding = "async";
+      img.onload = () => {
+        if (img.decode) {
+          img.decode().then(resolve).catch(resolve);
+        } else {
+          resolve();
         }
-      })
-    );
+      };
+      img.onerror = () => resolve();
+      img.src = displayUrl;
+    });
+  }
+
+  async function preloadOnePhoto(url) {
+    try {
+      const optimized = await optimizePhoto(url);
+      optimizedPhotoUrls.set(url, optimized);
+      await cacheImageUrl(optimized);
+    } catch {
+      const fallback = imageSrc(url);
+      optimizedPhotoUrls.set(url, fallback);
+      await cacheImageUrl(fallback);
+    }
+  }
+
+  // 先压首屏几张，再并行其余，失败单张不拖死整站
+  async function preloadImages() {
+    if (photoUrls.length === 0) return;
+    const priority = Math.min(4, photoUrls.length);
+    for (let i = 0; i < priority; i++) {
+      await preloadOnePhoto(photoUrls[i]);
+    }
+    await Promise.allSettled(photoUrls.slice(priority).map((u) => preloadOnePhoto(u)));
   }
 
   return { init, preloadImages };
 })();
 
-window.addEventListener("DOMContentLoaded", () => {
-  App.preloadImages();
+window.addEventListener("DOMContentLoaded", async () => {
+  await App.preloadImages();
   App.init();
 });
