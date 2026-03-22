@@ -808,7 +808,7 @@ const App = (() => {
       "WeixinJSBridgeReady",
       () => {
         if (!muted) {
-          tryPlayBgm();
+          warmBgmElement();
           primeYanhuaForMobile();
         }
       },
@@ -1215,8 +1215,7 @@ const App = (() => {
       goBtn.removeAttribute("aria-busy");
       return;
     }
-    const ratio = assetsLoadedCount / total;
-    if (ratio < 0.5) {
+    if (assetsLoadedCount < total) {
       goBtnLabelText.textContent = "资源加载中请等待";
       goBtnLabelText.classList.add("go-btn-label--loading");
       goBtn.disabled = true;
@@ -1253,8 +1252,10 @@ const App = (() => {
   function onMute() {
     setMute(!muted);
     if (!muted) {
-      tryPlayBgm();
       primeYanhuaForMobile();
+      if (started) {
+        tryPlayBgm();
+      }
     }
   }
 
