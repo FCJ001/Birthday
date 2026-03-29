@@ -299,11 +299,11 @@ const FX = (() => {
     rockets.length = 0;
   }
 
-  /** 十五发垂直升空礼花；每爆一次 optional onEachBurst；结束后 onComplete（重播按钮） */
+  /** 二十五发垂直升空礼花；每爆一次 optional onEachBurst；结束后 onComplete（重播按钮） */
   function playCakeFinaleFireworks(onComplete, onEachBurst) {
     stopCakeFinale();
     cakeFinaleOnBurst = typeof onEachBurst === "function" ? onEachBurst : null;
-    let remaining = 15;
+    let remaining = 25;
 
     function afterBurst() {
       remaining -= 1;
